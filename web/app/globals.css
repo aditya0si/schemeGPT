@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  /* Engineered-editorial palette (from haoqi.design, adapted) */
+  --color-paper: #fbfaf4;
+  --color-paper-dim: #efede7;
+  --color-ink: #000000;
+  --color-verified: #00784a;
+  --color-seed: #8a6a00;
+  --color-seed-bright: #ebc669;
+  --color-signal: #c0434c;
+  --color-live: #c0fe04;
+  --color-linkblue: #0077bc;
+
+  --font-sans: var(--font-archivo), var(--font-devanagari), sans-serif;
+  --font-mono: var(--font-martian), var(--font-devanagari), monospace;
+}
+
+/* Zero border-radius is a design rule: enforce globally. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+::selection {
+  background: #000;
+  color: #c0fe04;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.letter-stagger span {
+  display: inline-block;
+  opacity: 0;
+  animation: letter-in 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.caret::after {
+  content: "▮";
+  margin-left: 0.15em;
+  animation: caret-blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .letter-stagger span {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .caret::after {
+    animation: none;
+  }
+}
