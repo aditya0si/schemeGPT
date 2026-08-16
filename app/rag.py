@@ -355,9 +355,13 @@ def _build_profile_context(profile: ProfileData | None, language: str) -> str:
     return "<profile>\n" + "\n".join(lines) + "\n" + instruction + "\n</profile>"
 
 
-@lru_cache
-def build_chain(language: str = "en"):
-    """Build the LangChain retrieval chain for a language (cached per language)."""
+def get_retriever():
+    """Vector-store retriever used by both /query and /query/stream."""
+    return get_vectorstore().as_retriever()
+
+
+def build_answer_chain(language: str = "en"):
+    """Stuff-documents chain (prompt + LLM) for a language, no retrieval."""
     lang = _normalize_language(language)
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -365,8 +369,14 @@ def build_chain(language: str = "en"):
             ("human", HUMAN_TEMPLATE),
         ]
     )
-    stuff_docs_chain = create_stuff_documents_chain(get_llm(), prompt)
-    return create_retrieval_chain(get_vectorstore().as_retriever(), stuff_docs_chain)
+    return create_stuff_documents_chain(get_llm(), prompt)
+
+
+@lru_cache
+def build_chain(language: str = "en"):
+    """Build the LangChain retrieval chain for a language (cached per language)."""
+    lang = _normalize_language(language)
+    return create_retrieval_chain(get_retriever(), build_answer_chain(lang))
 
 
 def answer(
