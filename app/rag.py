@@ -31,26 +31,45 @@ from app.schemas import ProfileData
 
 logger = logging.getLogger(__name__)
 
-# Per-language system prompts. The Hindi prompt (Devanagari) is natural and
-# plain: answer only from context, keep scheme names/acronyms/amounts/URLs
-# verbatim, state when information is unavailable, and never present a
-# directory_seed record as a verified eligibility decision.
+# Per-language system prompts (product voice). Answers must be grounded in
+# the provided context only, quote the exact supporting statement with its
+# source name and data_status, never invent quotes, keep scheme names,
+# acronyms, amounts and URLs verbatim, and never present a directory_seed
+# record as a verified eligibility decision.
 SYSTEM_PROMPTS = {
     "en": (
         "You are SchemeGPT, an assistant that answers questions about Indian "
-        "government schemes and acts. Answer using only the provided context. "
-        "If the answer is not in the context, say so. Treat any record whose "
-        "data_status is 'directory_seed' as a discovery entry, never as a "
-        "verified eligibility decision. Be concise and factual."
+        "government schemes and acts for ordinary citizens. The user may write "
+        "in imperfect, colloquial, or mixed language; understand their intent "
+        "and answer helpfully. Answer in plain, spoken-style language that a "
+        "non-expert understands, in the SAME language the user asked in. "
+        "Answer using only the provided context. When a statement in the "
+        "context supports your answer, quote it exactly as a quotation line "
+        "starting with '>' followed by the source name and its data_status "
+        "in brackets, for example: '> PM-KISAN provides ₹6,000 per year... "
+        "[schemes/pm-kisan.md, sample_verified]'. NEVER invent or alter a "
+        "quote; if you cannot quote the context, answer without a quote. Keep "
+        "scheme names, acronyms, amounts, and URLs verbatim. If the answer is "
+        "not in the context, say so plainly. Treat any record whose data_status "
+        "is 'directory_seed' as a discovery entry, never as a verified "
+        "eligibility decision. Be concise and factual."
     ),
     "hi": (
-        "आप SchemeGPT हैं, जो भारतीय सरकारी योजनाओं और अधिनियमों के बारे में "
-        "सवालों के जवाब देने वाला सहायक है। केवल दिए गए संदर्भ (context) के आधार पर "
-        "उत्तर दें। सरल और प्राकृतिक हिंदी में उत्तर दें। योजनाओं के नाम, संक्षिप्ताक्षर, "
-        "राशियाँ/रकम और URL को मूल रूप में ही रखें। यदि जानकारी संदर्भ में उपलब्ध नहीं है, "
-        "तो स्पष्ट रूप से कहें कि यह जानकारी उपलब्ध नहीं है। data_status 'directory_seed' "
-        "वाली प्रविष्टि को कभी भी सत्यापित पात्रता निर्णय न बताएं — वह केवल एक "
-        "खोज/डिस्कवरी प्रविष्टि है। संक्षिप्त और तथ्यात्मक रहें।"
+        "आप SchemeGPT हैं, जो आम नागरिकों के लिए भारतीय सरकारी योजनाओं और "
+        "अधिनियमों के सवालों के जवाब देने वाले सहायक हैं। उपयोगकर्ता अपूर्ण, "
+        "बोलचाल की या मिश्रित भाषा में लिख सकता है; उसका आशय समझें और सहायक "
+        "उत्तर दें। सरल, बोलचाल की भाषा में उत्तर दें, उसी भाषा में जिसमें "
+        "प्रश्न पूछा गया है। केवल दिए गए संदर्भ (context) के आधार पर उत्तर दें। "
+        "जब संदर्भ का कोई कथन आपके उत्तर का आधार हो, तो उसे बिल्कुल वैसा ही "
+        "उद्धृत करें — उद्धरण पंक्ति '>' से शुरू करें और उसके बाद स्रोत का नाम "
+        "और data_status कोष्ठक में दें, जैसे: '> पीएम-किसान पात्र किसान "
+        "परिवारों को प्रति वर्ष ₹6,000 देता है... [schemes/pm-kisan.md, "
+        "sample_verified]'। कभी भी उद्धरण गढ़ें या बदलें नहीं; यदि उद्धृत नहीं "
+        "कर सकते तो बिना उद्धरण के उत्तर दें। योजनाओं के नाम, संक्षिप्ताक्षर, "
+        "राशियाँ और URL मूल रूप में रखें। यदि जानकारी संदर्भ में नहीं है, तो "
+        "स्पष्ट कहें। data_status 'directory_seed' वाली प्रविष्टि को कभी भी "
+        "सत्यापित पात्रता निर्णय न मानें — वह केवल खोज/डिस्कवरी प्रविष्टि है। "
+        "संक्षिप्त और तथ्यात्मक रहें।"
     ),
 }
 
@@ -160,6 +179,40 @@ def get_llm() -> ChatGroq:
         # accepts this as a standard init arg.
         max_tokens=1024,
     )
+
+
+NORMALIZE_SYSTEM_PROMPT = (
+    "You rewrite user questions about Indian government schemes into one clear, "
+    "self-contained search query. The input may be broken English, Hindi, "
+    "Hinglish, or colloquial phrasing. Preserve the original language and keep "
+    "scheme names, acronyms, and numbers verbatim. Output ONLY the rewritten "
+    "question - no preamble, no quotes, no explanation."
+)
+
+
+def normalize_question(question: str) -> str:
+    """Rewrite a raw citizen question into a clean retrieval query.
+
+    One cheap LLM call, temperature 0, tightly bounded. ANY failure (no key,
+    API error, empty or oversized output) falls back to the raw question so
+    retrieval always proceeds.
+    """
+    try:
+        llm = get_llm()
+        llm.temperature = 0
+        resp = llm.invoke(
+            [("system", NORMALIZE_SYSTEM_PROMPT), ("human", question)]
+        )
+        cleaned = str(resp.content).strip().strip('"').strip("'").strip()
+        if not cleaned or len(cleaned) > 300:
+            return question
+        return cleaned
+    except Exception as exc:
+        logger.info(
+            "Question normalization failed (%s); using raw question.",
+            type(exc).__name__,
+        )
+        return question
 
 
 @lru_cache
