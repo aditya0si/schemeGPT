@@ -3,12 +3,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from app import catalog, ingest, profiles, recommend
 from app.config import settings
 from app.db import COLLECTION_NAME, get_engine
 from app.rag import answer
+from app.stream import stream_answer
 from app.schemas import (
     ProfileCreateResponse,
     ProfileData,
@@ -193,4 +195,19 @@ def query(req: QueryRequest):
             language=req.language,
             profile=req.profile,
         )
+    )
+
+
+@app.post("/query/stream")
+async def query_stream(req: QueryRequest):
+    """Streamed variant of /query over Server-Sent Events.
+
+    Same request schema and bounds; events: sources -> token* -> done|error.
+    Demo fallback semantics are identical to /query: labelled, HTTP 200,
+    never a traceback.
+    """
+    return StreamingResponse(
+        stream_answer(req.question, req.language, req.profile),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
