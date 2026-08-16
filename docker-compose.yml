@@ -43,7 +43,7 @@ services:
       retries: 10
       start_period: 300s
 
-  web:
+  streamlit:
     build:
       context: .
       dockerfile: Dockerfile.streamlit
@@ -57,6 +57,19 @@ services:
         condition: service_healthy
     ports:
       - "8501:8501"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
 
 volumes:
   pgdata:

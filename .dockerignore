@@ -17,3 +17,7 @@ eval/results
 
 # Local model/hub cache
 data/.cache
+
+# Next.js build artifacts (built inside the web image)
+web/node_modules
+web/.next

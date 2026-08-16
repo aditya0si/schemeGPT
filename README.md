@@ -27,7 +27,9 @@ A domain RAG question-answering platform over Indian government schemes and acts
      `python -c "import secrets; print(secrets.token_urlsafe(32))"`) to enable
      token-protected re-ingestion. Startup auto-ingestion runs regardless.
 2. `docker compose up --build`
-3. Open http://localhost:8501 (chat demo) and http://localhost:8000/docs (API docs).
+3. Open http://localhost:3000 (new engineered-editorial UI), http://localhost:8501
+   (Streamlit chat demo, kept during migration), and http://localhost:8000/docs
+   (API docs).
 
    Note: the API port is bound to **localhost only** (`127.0.0.1:8000`), so the
    docs are reachable on the machine running the stack (or over an SSH tunnel
@@ -433,7 +435,7 @@ curl http://localhost:8000/health   # expect {"status":"ok"}
   or unavailable keys fall back to clearly-labelled demo responses. Set a valid
   `GROQ_API_KEY` and `docker compose restart api` for live answers.
 - **Cannot reach the UI on 8501:** confirm the provider firewall *and* host
-  firewall allow 8501, that `docker compose ps` shows `web` as running, and
+  firewall allow 8501, that `docker compose ps` shows `streamlit` as running, and
   that you use `http://<VPS_IP>:8501` (not https). The API on 8000 is bound to
   localhost by design - use the SSH tunnel from step 5.
 
