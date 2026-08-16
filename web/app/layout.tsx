@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo, Martian_Mono, Noto_Sans_Devanagari } from "next/font/google";
+import { FooterChrome, HeaderChrome } from "../components/Chrome";
+import { LanguageProvider } from "../components/LanguageProvider";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -28,10 +30,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${archivo.variable} ${martian.variable} ${devanagari.variable} bg-paper text-ink font-sans antialiased`}
-      >
-        {children}
+      <body className={`${archivo.variable} ${martian.variable} ${devanagari.variable} bg-paper text-ink font-sans antialiased`}>
+        <LanguageProvider>
+          <HeaderChrome />
+          <main className="min-h-[70vh]">{children}</main>
+          <FooterChrome />
+        </LanguageProvider>
       </body>
     </html>
   );
