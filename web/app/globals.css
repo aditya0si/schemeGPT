@@ -11,7 +11,12 @@
   --color-signal: #c0434c;
   --color-live: #c0fe04;
   --color-linkblue: #0077bc;
+}
 
+/* Font tokens reference next/font CSS variables that are defined on <body>,
+   not :root — `inline` makes utilities carry the var() references directly
+   instead of re-defining them at :root where they would not resolve. */
+@theme inline {
   --font-sans: var(--font-archivo), var(--font-devanagari), sans-serif;
   --font-mono: var(--font-martian), var(--font-devanagari), monospace;
 }
