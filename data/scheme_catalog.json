@@ -1,0 +1,868 @@
+{
+  "catalog_version": 1,
+  "description": "Structured recommendation catalog for SchemeGPT. Central sample schemes carry metadata derived from their Markdown docs (data_status: sample_verified). State/Union Territory records are discovery/coverage seeds (data_status: directory_seed) that link to the official national discovery portal; they contain no invented benefits. Income caps are expressed on an annual basis when the source doc states a monthly cap.",
+  "last_updated": "2026-08-02",
+  "records": [
+    {
+      "id": "pm-kisan",
+      "name": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/pm-kisan.md",
+      "source_url": "https://pmkisan.gov.in/",
+      "tags": [
+        "income support",
+        "farmers",
+        "agriculture",
+        "direct benefit transfer"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "occupations": [
+        "farmer"
+      ],
+      "states": []
+    },
+    {
+      "id": "ayushman-bharat",
+      "name": "Ayushman Bharat PM-JAY",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/ayushman-bharat.md",
+      "source_url": "https://pmjay.gov.in/",
+      "tags": [
+        "health",
+        "health insurance",
+        "hospitalisation",
+        "health cover"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "states": []
+    },
+    {
+      "id": "pmay-g",
+      "name": "PMAY-G (Pradhan Mantri Awas Yojana - Gramin)",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/pmay-g.md",
+      "source_url": "https://pmayg.nic.in/",
+      "tags": [
+        "housing",
+        "rural housing",
+        "financial assistance"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "occupations": [],
+      "rural": true,
+      "states": []
+    },
+    {
+      "id": "pm-sym",
+      "name": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan)",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/pm-sym.md",
+      "source_url": "https://labour.gov.in/pm-sym",
+      "tags": [
+        "pension",
+        "social security",
+        "unorganised workers"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "occupations": [
+        "unorganised worker"
+      ],
+      "min_age": 18,
+      "max_age": 40,
+      "income_max": 180000,
+      "states": []
+    },
+    {
+      "id": "startup-india",
+      "name": "Startup India",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/startup-india.md",
+      "source_url": "https://www.startupindia.gov.in/",
+      "tags": [
+        "startups",
+        "entrepreneurship",
+        "tax exemption",
+        "dpiit recognition"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "states": []
+    },
+    {
+      "id": "gst",
+      "name": "Goods and Services Tax (GST) Act",
+      "jurisdiction": "central",
+      "source_file": "data/schemes/gst.md",
+      "source_url": "https://www.gst.gov.in/",
+      "tags": [
+        "tax",
+        "gst",
+        "registration",
+        "compliance"
+      ],
+      "data_status": "sample_verified",
+      "last_verified": "2026-08-02",
+      "states": []
+    },
+    {
+      "id": "state-ap",
+      "name": "Andhra Pradesh",
+      "jurisdiction": "Andhra Pradesh",
+      "type": "state",
+      "code": "AP",
+      "region": "South",
+      "source_file": "data/states/andhra-pradesh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ar",
+      "name": "Arunachal Pradesh",
+      "jurisdiction": "Arunachal Pradesh",
+      "type": "state",
+      "code": "AR",
+      "region": "Northeast",
+      "source_file": "data/states/arunachal-pradesh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-as",
+      "name": "Assam",
+      "jurisdiction": "Assam",
+      "type": "state",
+      "code": "AS",
+      "region": "Northeast",
+      "source_file": "data/states/assam.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-br",
+      "name": "Bihar",
+      "jurisdiction": "Bihar",
+      "type": "state",
+      "code": "BR",
+      "region": "East",
+      "source_file": "data/states/bihar.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-cg",
+      "name": "Chhattisgarh",
+      "jurisdiction": "Chhattisgarh",
+      "type": "state",
+      "code": "CG",
+      "region": "Central",
+      "source_file": "data/states/chhattisgarh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ga",
+      "name": "Goa",
+      "jurisdiction": "Goa",
+      "type": "state",
+      "code": "GA",
+      "region": "West",
+      "source_file": "data/states/goa.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-gj",
+      "name": "Gujarat",
+      "jurisdiction": "Gujarat",
+      "type": "state",
+      "code": "GJ",
+      "region": "West",
+      "source_file": "data/states/gujarat.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-hr",
+      "name": "Haryana",
+      "jurisdiction": "Haryana",
+      "type": "state",
+      "code": "HR",
+      "region": "North",
+      "source_file": "data/states/haryana.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-hp",
+      "name": "Himachal Pradesh",
+      "jurisdiction": "Himachal Pradesh",
+      "type": "state",
+      "code": "HP",
+      "region": "North",
+      "source_file": "data/states/himachal-pradesh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-jh",
+      "name": "Jharkhand",
+      "jurisdiction": "Jharkhand",
+      "type": "state",
+      "code": "JH",
+      "region": "East",
+      "source_file": "data/states/jharkhand.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ka",
+      "name": "Karnataka",
+      "jurisdiction": "Karnataka",
+      "type": "state",
+      "code": "KA",
+      "region": "South",
+      "source_file": "data/states/karnataka.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-kl",
+      "name": "Kerala",
+      "jurisdiction": "Kerala",
+      "type": "state",
+      "code": "KL",
+      "region": "South",
+      "source_file": "data/states/kerala.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-mp",
+      "name": "Madhya Pradesh",
+      "jurisdiction": "Madhya Pradesh",
+      "type": "state",
+      "code": "MP",
+      "region": "Central",
+      "source_file": "data/states/madhya-pradesh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-mh",
+      "name": "Maharashtra",
+      "jurisdiction": "Maharashtra",
+      "type": "state",
+      "code": "MH",
+      "region": "West",
+      "source_file": "data/states/maharashtra.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-mn",
+      "name": "Manipur",
+      "jurisdiction": "Manipur",
+      "type": "state",
+      "code": "MN",
+      "region": "Northeast",
+      "source_file": "data/states/manipur.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ml",
+      "name": "Meghalaya",
+      "jurisdiction": "Meghalaya",
+      "type": "state",
+      "code": "ML",
+      "region": "Northeast",
+      "source_file": "data/states/meghalaya.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-mz",
+      "name": "Mizoram",
+      "jurisdiction": "Mizoram",
+      "type": "state",
+      "code": "MZ",
+      "region": "Northeast",
+      "source_file": "data/states/mizoram.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-nl",
+      "name": "Nagaland",
+      "jurisdiction": "Nagaland",
+      "type": "state",
+      "code": "NL",
+      "region": "Northeast",
+      "source_file": "data/states/nagaland.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-od",
+      "name": "Odisha",
+      "jurisdiction": "Odisha",
+      "type": "state",
+      "code": "OD",
+      "region": "East",
+      "source_file": "data/states/odisha.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-pb",
+      "name": "Punjab",
+      "jurisdiction": "Punjab",
+      "type": "state",
+      "code": "PB",
+      "region": "North",
+      "source_file": "data/states/punjab.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-rj",
+      "name": "Rajasthan",
+      "jurisdiction": "Rajasthan",
+      "type": "state",
+      "code": "RJ",
+      "region": "North",
+      "source_file": "data/states/rajasthan.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-sk",
+      "name": "Sikkim",
+      "jurisdiction": "Sikkim",
+      "type": "state",
+      "code": "SK",
+      "region": "Northeast",
+      "source_file": "data/states/sikkim.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-tn",
+      "name": "Tamil Nadu",
+      "jurisdiction": "Tamil Nadu",
+      "type": "state",
+      "code": "TN",
+      "region": "South",
+      "source_file": "data/states/tamil-nadu.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ts",
+      "name": "Telangana",
+      "jurisdiction": "Telangana",
+      "type": "state",
+      "code": "TS",
+      "region": "South",
+      "source_file": "data/states/telangana.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-tr",
+      "name": "Tripura",
+      "jurisdiction": "Tripura",
+      "type": "state",
+      "code": "TR",
+      "region": "Northeast",
+      "source_file": "data/states/tripura.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-up",
+      "name": "Uttar Pradesh",
+      "jurisdiction": "Uttar Pradesh",
+      "type": "state",
+      "code": "UP",
+      "region": "North",
+      "source_file": "data/states/uttar-pradesh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-uk",
+      "name": "Uttarakhand",
+      "jurisdiction": "Uttarakhand",
+      "type": "state",
+      "code": "UK",
+      "region": "North",
+      "source_file": "data/states/uttarakhand.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-wb",
+      "name": "West Bengal",
+      "jurisdiction": "West Bengal",
+      "type": "state",
+      "code": "WB",
+      "region": "East",
+      "source_file": "data/states/west-bengal.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-an",
+      "name": "Andaman and Nicobar Islands",
+      "jurisdiction": "Andaman and Nicobar Islands",
+      "type": "union_territory",
+      "code": "AN",
+      "region": "South",
+      "source_file": "data/states/andaman-and-nicobar-islands.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ch",
+      "name": "Chandigarh",
+      "jurisdiction": "Chandigarh",
+      "type": "union_territory",
+      "code": "CH",
+      "region": "North",
+      "source_file": "data/states/chandigarh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-dd",
+      "name": "Dadra and Nagar Haveli and Daman and Diu",
+      "jurisdiction": "Dadra and Nagar Haveli and Daman and Diu",
+      "type": "union_territory",
+      "code": "DD",
+      "region": "West",
+      "source_file": "data/states/dadra-and-nagar-haveli-and-daman-and-diu.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-dl",
+      "name": "Delhi (NCT)",
+      "jurisdiction": "Delhi (NCT)",
+      "type": "union_territory",
+      "code": "DL",
+      "region": "North",
+      "source_file": "data/states/delhi-nct.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-jk",
+      "name": "Jammu and Kashmir",
+      "jurisdiction": "Jammu and Kashmir",
+      "type": "union_territory",
+      "code": "JK",
+      "region": "North",
+      "source_file": "data/states/jammu-and-kashmir.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-la",
+      "name": "Ladakh",
+      "jurisdiction": "Ladakh",
+      "type": "union_territory",
+      "code": "LA",
+      "region": "North",
+      "source_file": "data/states/ladakh.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-ld",
+      "name": "Lakshadweep",
+      "jurisdiction": "Lakshadweep",
+      "type": "union_territory",
+      "code": "LD",
+      "region": "South",
+      "source_file": "data/states/lakshadweep.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    },
+    {
+      "id": "state-py",
+      "name": "Puducherry",
+      "jurisdiction": "Puducherry",
+      "type": "union_territory",
+      "code": "PY",
+      "region": "South",
+      "source_file": "data/states/puducherry.md",
+      "source_url": "https://www.myscheme.gov.in/",
+      "tags": [
+        "income support",
+        "health",
+        "education",
+        "housing",
+        "jobs",
+        "agriculture",
+        "social security"
+      ],
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02"
+    }
+  ]
+}

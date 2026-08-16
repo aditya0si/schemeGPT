@@ -1,0 +1,367 @@
+{
+  "catalog_version": 1,
+  "description": "Nationwide discovery/coverage directory for all Indian states and union territories. Every record is a directory_seed: it identifies a jurisdiction for scheme search and links to the official national MyScheme discovery portal. Records are NOT verified scheme-level eligibility data.",
+  "last_updated": "2026-08-02",
+  "records": [
+    {
+      "id": "ap",
+      "name": "Andhra Pradesh",
+      "type": "state",
+      "code": "AP",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ar",
+      "name": "Arunachal Pradesh",
+      "type": "state",
+      "code": "AR",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "as",
+      "name": "Assam",
+      "type": "state",
+      "code": "AS",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "br",
+      "name": "Bihar",
+      "type": "state",
+      "code": "BR",
+      "region": "East",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "cg",
+      "name": "Chhattisgarh",
+      "type": "state",
+      "code": "CG",
+      "region": "Central",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ga",
+      "name": "Goa",
+      "type": "state",
+      "code": "GA",
+      "region": "West",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "gj",
+      "name": "Gujarat",
+      "type": "state",
+      "code": "GJ",
+      "region": "West",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "hr",
+      "name": "Haryana",
+      "type": "state",
+      "code": "HR",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "hp",
+      "name": "Himachal Pradesh",
+      "type": "state",
+      "code": "HP",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "jh",
+      "name": "Jharkhand",
+      "type": "state",
+      "code": "JH",
+      "region": "East",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ka",
+      "name": "Karnataka",
+      "type": "state",
+      "code": "KA",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "kl",
+      "name": "Kerala",
+      "type": "state",
+      "code": "KL",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "mp",
+      "name": "Madhya Pradesh",
+      "type": "state",
+      "code": "MP",
+      "region": "Central",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "mh",
+      "name": "Maharashtra",
+      "type": "state",
+      "code": "MH",
+      "region": "West",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "mn",
+      "name": "Manipur",
+      "type": "state",
+      "code": "MN",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ml",
+      "name": "Meghalaya",
+      "type": "state",
+      "code": "ML",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "mz",
+      "name": "Mizoram",
+      "type": "state",
+      "code": "MZ",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "nl",
+      "name": "Nagaland",
+      "type": "state",
+      "code": "NL",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "od",
+      "name": "Odisha",
+      "type": "state",
+      "code": "OD",
+      "region": "East",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "pb",
+      "name": "Punjab",
+      "type": "state",
+      "code": "PB",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "rj",
+      "name": "Rajasthan",
+      "type": "state",
+      "code": "RJ",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "sk",
+      "name": "Sikkim",
+      "type": "state",
+      "code": "SK",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "tn",
+      "name": "Tamil Nadu",
+      "type": "state",
+      "code": "TN",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ts",
+      "name": "Telangana",
+      "type": "state",
+      "code": "TS",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "tr",
+      "name": "Tripura",
+      "type": "state",
+      "code": "TR",
+      "region": "Northeast",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "up",
+      "name": "Uttar Pradesh",
+      "type": "state",
+      "code": "UP",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "uk",
+      "name": "Uttarakhand",
+      "type": "state",
+      "code": "UK",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "wb",
+      "name": "West Bengal",
+      "type": "state",
+      "code": "WB",
+      "region": "East",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "an",
+      "name": "Andaman and Nicobar Islands",
+      "type": "union_territory",
+      "code": "AN",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ch",
+      "name": "Chandigarh",
+      "type": "union_territory",
+      "code": "CH",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "dd",
+      "name": "Dadra and Nagar Haveli and Daman and Diu",
+      "type": "union_territory",
+      "code": "DD",
+      "region": "West",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "dl",
+      "name": "Delhi (NCT)",
+      "type": "union_territory",
+      "code": "DL",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "jk",
+      "name": "Jammu and Kashmir",
+      "type": "union_territory",
+      "code": "JK",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "la",
+      "name": "Ladakh",
+      "type": "union_territory",
+      "code": "LA",
+      "region": "North",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "ld",
+      "name": "Lakshadweep",
+      "type": "union_territory",
+      "code": "LD",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    },
+    {
+      "id": "py",
+      "name": "Puducherry",
+      "type": "union_territory",
+      "code": "PY",
+      "region": "South",
+      "data_status": "directory_seed",
+      "last_verified": "2026-08-02",
+      "discovery_url": "https://www.myscheme.gov.in/"
+    }
+  ]
+}

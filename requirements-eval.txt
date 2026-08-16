@@ -1,0 +1,9 @@
+-r requirements.txt
+# --- Evaluation-only dependencies (not installed in production) ---
+# ragas 0.2.15 is the latest 0.2.x release compatible with langchain 0.3.21.
+# Note: ragas 0.2.15 declares langchain-openai/openai as dependencies, but the
+# harness always injects ChatGroq (app.rag.get_llm) and local HuggingFace
+# embeddings (app.db.get_embeddings), so no OpenAI API call is ever made.
+ragas==0.2.15
+# ragas depends on `datasets` unpinned; pin it directly for determinism.
+datasets==2.21.0

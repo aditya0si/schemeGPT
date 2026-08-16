@@ -1,0 +1,19 @@
+# Version control
+.git
+
+# Local virtualenv
+.venv
+
+# Python caches (keep the build context small)
+__pycache__
+*.pyc
+*.pyo
+
+# Secrets - never bake into an image
+.env
+
+# Evaluation outputs (large generated reports)
+eval/results
+
+# Local model/hub cache
+data/.cache

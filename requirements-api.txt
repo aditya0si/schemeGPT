@@ -1,0 +1,16 @@
+# API Docker image dependencies.
+#
+# Local sentence-transformers embeddings (all-MiniLM-L6-v2) run on CPU. On
+# Linux, a plain `pip install sentence-transformers` lets pip resolve the
+# CUDA-enabled torch wheel from PyPI (~2 GB unpacked), whose download
+# frequently exceeds free-VPS build timeouts. This file pins a verified
+# CPU-only wheel from the official PyTorch CPU index so the API image stays
+# small and CPU-only. The application embedding API is unchanged: the same
+# `app.db.get_embeddings()` model runs on the CPU as in local development.
+#
+# torch==2.6.0+cpu is the latest cp312 Linux x86_64 CPU wheel on the official
+# CPU index. It satisfies sentence-transformers 3.4.1 (torch>=1.11) and the
+# current transformers stack (torch>=2.2). No CUDA package is pulled.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0+cpu
+-r requirements.txt

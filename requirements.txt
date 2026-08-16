@@ -1,0 +1,16 @@
+fastapi==0.115.12
+uvicorn==0.34.0
+langchain==0.3.21
+# langchain-community 0.3.21 requires langchain>=0.3.23; 0.3.20 is the last
+# release compatible with the pinned langchain==0.3.21 (pre-existing conflict).
+langchain-community==0.3.20
+langchain-groq==0.3.5
+langchain-huggingface==0.1.2
+sentence-transformers==3.4.1
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+python-dotenv==1.1.0
+pydantic-settings==2.8.1
+python-multipart==0.0.20
+# streamlit and requests are NOT part of the API image. They are installed only
+# for the Streamlit demo via requirements-streamlit.txt (Dockerfile.streamlit).

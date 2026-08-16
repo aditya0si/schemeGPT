@@ -1,0 +1,123 @@
+{
+  "description": "Pre-made demo answers for SchemeGPT fallback mode. Used only when the live Groq RAG path is unavailable (missing/invalid/rate-limited GROQ_API_KEY or an API/runtime error). Facts mirror data/schemes/*.md. Each record may carry answer_hi/notice_hi so Hindi requests receive Devanagari text; when answer_hi is missing, a safe short Hindi fallback is returned instead of English text.",
+  "responses": [
+    {
+      "id": "pm-kisan",
+      "keywords": [
+        "pm-kisan", "pm kisan", "kisan samman nidhi", "kisan",
+        "income support", "6000", "6,000", "instalment", "installment",
+        "2000", "direct benefit transfer", "dbt", "farmer"
+      ],
+      "answer": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi) is a central sector scheme that provides income support of Rs 6,000 per year to eligible landholding farmer families in India. The amount is paid directly into the beneficiary's bank account through Direct Benefit Transfer (DBT) in three equal instalments of Rs 2,000 each, released every four months.",
+      "answer_hi": "पीएम-किसान (प्रधानमंत्री किसान सम्मान निधि) एक केंद्रीय क्षेत्र की योजना है जो भारत में पात्र भूमिधारी किसान परिवारों को प्रति वर्ष ₹6,000 की आय सहायता प्रदान करती है। यह राशि डायरेक्ट बेनिफिट ट्रांसफर (डीबीटी) के माध्यम से सीधे लाभार्थी के बैंक खाते में ₹2,000 की तीन समान किश्तों में दी जाती है, और हर चार महीने में एक किश्त जारी की जाती है।",
+      "sources": [
+        {
+          "source": "pm-kisan.md",
+          "content": "PM-KISAN is a central sector scheme that provides income support to landholding farmer families in India. Under the scheme, eligible farmers receive Rs 6,000 per year, paid directly into their bank accounts through Direct Benefit Transfer (DBT). Payment: Rs 6,000 per year, paid in three equal instalments of Rs 2,000 each. Frequency: instalments are released every four months."
+        }
+      ]
+    },
+    {
+      "id": "pm-kisan-exclusions",
+      "keywords": [
+        "excluded", "exclusion", "not eligible", "ineligible",
+        "pm-kisan", "pm kisan", "kisan", "institutional landholder",
+        "income tax", "government employee"
+      ],
+      "answer": "Excluded from PM-KISAN are institutional landholders, farmer families where any member pays income tax, and families with a government employee in a higher grade. Duplicate or ineligible beneficiaries are also removed through periodic verification drives.",
+      "answer_hi": "पीएम-किसान से बाहर रखे गए हैं: संस्थागत भूमिधारक, ऐसे किसान परिवार जिनका कोई सदस्य आयकर चुकाता है, और ऐसे परिवार जिनमें उच्च श्रेणी का सरकारी कर्मचारी है। नकली या अपात्र लाभार्थियों को समय-समय पर सत्यापन अभियानों के माध्यम से भी हटाया जाता है।",
+      "sources": [
+        {
+          "source": "pm-kisan.md",
+          "content": "Exclusions: institutional landholders, farmer families where any member pays income tax, and families with a government employee in a higher grade. Duplicate or ineligible beneficiaries are removed through periodic verification drives."
+        }
+      ]
+    },
+    {
+      "id": "ayushman-bharat",
+      "keywords": [
+        "ayushman", "pm-jay", "pm jay", "jan arogya", "health insurance",
+        "health cover", "5 lakh", "500000", "hospitalisation", "hospitalization",
+        "insurance", "cashless"
+      ],
+      "answer": "Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY) provides a health cover of Rs 5 lakh per family per year, on a floater basis, for secondary and tertiary hospitalisation. Around 12 crore families (approximately 55 crore individuals) are covered, and treatment is cashless and paperless at empanelled hospitals anywhere in India.",
+      "answer_hi": "आयुष्मान भारत प्रधानमंत्री जन आरोग्य योजना (पीएम-जय) प्रत्येक परिवार को प्रति वर्ष ₹5 लाख तक का स्वास्थ्य कवर देती है, जो फ्लोटर आधार पर माध्यमिक और तृतीयक अस्पताल में भर्ती के लिए है। लगभग 12 करोड़ परिवार (लगभग 55 करोड़ व्यक्ति) कवर हैं, और भारत में कहीं भी इम्पैनल्ड अस्पतालों में उपचार कैशलेस और कागजरहित है।",
+      "sources": [
+        {
+          "source": "ayushman-bharat.md",
+          "content": "Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY) is the largest health insurance scheme in the world. It provides a health cover of Rs 5 lakh per family per year for secondary and tertiary hospitalisation. Cover: Rs 5 lakh per family per year, on a floater basis. Beneficiaries: around 12 crore families (approximately 55 crore individuals)."
+        }
+      ]
+    },
+    {
+      "id": "pmay-g",
+      "keywords": [
+        "pmay", "pmay-g", "pmay g", "awas yojana", "housing", "pucca house",
+        "1.20 lakh", "1.30 lakh", "rural housing", "gramin", "financial assistance"
+      ],
+      "answer": "Pradhan Mantri Awas Yojana - Gramin (PMAY-G) provides financial assistance of Rs 1.20 lakh per house in plain areas and Rs 1.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts for constructing a pucca house with basic amenities. Funding is shared between the central and state governments (60:40 in plain areas).",
+      "answer_hi": "प्रधानमंत्री आवास योजना - ग्रामीण (पीएमएवाई-जी) मैदानी क्षेत्रों में प्रति घर ₹1.20 लाख और पहाड़ी क्षेत्रों, कठिन क्षेत्रों और एकीकृत कार्य योजना (आईएपी) जिलों में ₹1.30 लाख की वित्तीय सहायता देती है, ताकि बुनियादी सुविधाओं के साथ पक्का मकान बनाया जा सके। धनराशि केंद्र और राज्य सरकारों के बीच साझा की जाती है (मैदानी क्षेत्रों में 60:40)।",
+      "sources": [
+        {
+          "source": "pmay-g.md",
+          "content": "Pradhan Mantri Awas Yojana - Gramin (PMAY-G) is a rural housing scheme that provides financial assistance to eligible rural households for constructing a pucca house with basic amenities. Financial assistance: Rs 1.20 lakh per house in plain areas and Rs 1.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts. Funding: shared between the central and state governments, 60:40 in plain areas."
+        }
+      ]
+    },
+    {
+      "id": "pm-sym",
+      "keywords": [
+        "pm-sym", "pm sym", "shram yogi", "maandhan", "pension", "3000", "3,000",
+        "unorganised", "unorganized", "60 years", "retirement"
+      ],
+      "answer": "Pradhan Mantri Shram Yogi Maandhan (PM-SYM) provides a monthly pension of Rs 3,000 after the subscriber attains the age of 60 years. The entry age is 18 to 40 years, contributions range from Rs 55 to Rs 200 per month, and the central government makes an equal matching contribution. Eligible workers are unorganised workers with monthly income up to Rs 15,000.",
+      "answer_hi": "प्रधानमंत्री श्रम योगी मानधन (पीएम-एसवाईएम) सब्सक्राइबर के 60 वर्ष की आयु प्राप्त करने के बाद प्रति माह ₹3,000 की पेंशन देता है। प्रवेश आयु 18 से 40 वर्ष है, मासिक योगदान ₹55 से ₹200 तक है, और केंद्र सरकार बराबर का मैचिंग योगदान करती है। पात्र श्रमिक वे असंगठित श्रमिक हैं जिनकी मासिक आय ₹15,000 तक है।",
+      "sources": [
+        {
+          "source": "pm-sym.md",
+          "content": "Pradhan Mantri Shram Yogi Maandhan (PM-SYM) is a pension scheme for unorganised workers. It provides a monthly pension of Rs 3,000 after the subscriber attains the age of 60 years. Entry age: 18 to 40 years. Contribution: Rs 55 to Rs 200 per month. Government contribution: the central government makes an equal matching contribution. Eligibility: unorganised workers with monthly income up to Rs 15,000."
+        }
+      ]
+    },
+    {
+      "id": "startup-india",
+      "keywords": [
+        "startup", "startup india", "dpiit", "recognition", "llp",
+        "private limited", "100 crore", "turnover", "angel tax",
+        "tax exemption", "innovation"
+      ],
+      "answer": "Under Startup India, an entity is eligible for DPIIT recognition if it is incorporated as a private limited company, LLP, or registered partnership, is less than 10 years old, and has a turnover of up to Rs 100 crore in any financial year. Recognised startups get a 100% income tax exemption on profits for 3 consecutive financial years out of the first 10 years and are exempt from angel tax.",
+      "answer_hi": "स्टार्टअप इंडिया के तहत, डीपीआईआईटी मान्यता के लिए एक इकाई तभी पात्र है जब वह प्राइवेट लिमिटेड कंपनी, एलएलपी या पंजीकृत साझेदारी के रूप में पंजीकृत हो, 10 वर्ष से कम पुरानी हो, और किसी भी वित्तीय वर्ष में उसका टर्नओवर ₹100 करोड़ तक हो। मान्यता प्राप्त स्टार्टअप को पहले 10 वर्षों में से लगातार 3 वित्तीय वर्षों के मुनाफे पर 100% आयकर छूट मिलती है और वे एंजेल टैक्स से मुक्त हैं।",
+      "sources": [
+        {
+          "source": "startup-india.md",
+          "content": "Startup India is a flagship initiative of the Government of India to build a strong ecosystem for innovation and startups. Eligibility: an entity must be incorporated as a private limited company, LLP, or registered partnership, be less than 10 years old, and have a turnover up to Rs 100 crore in any financial year. Tax exemption: a 100% income tax exemption on profits for 3 consecutive financial years out of the first 10 years. Angel tax: recognised startups are exempt from angel tax."
+        }
+      ]
+    },
+    {
+      "id": "gst",
+      "keywords": [
+        "gst", "goods and services tax", "registration", "turnover",
+        "40 lakh", "20 lakh", "vat", "service tax", "excise", "2017",
+        "tax slab", "itc", "input tax credit"
+      ],
+      "answer": "The Goods and Services Tax (GST) was introduced in India on 1 July 2017 and subsumed multiple indirect taxes such as VAT, service tax, and excise duty. Businesses above the turnover threshold must register: Rs 40 lakh for goods and Rs 20 lakh for services, with lower thresholds in some states. The main tax slabs are 5%, 12%, 18%, and 28%.",
+      "answer_hi": "गुड्स एंड सर्विसेज टैक्स (जीएसटी) भारत में 1 जुलाई 2017 को लागू हुआ और इसने वैट, सर्विस टैक्स और एक्साइज ड्यूटी जैसे कई अप्रत्यक्ष करों को समाहित कर लिया। टर्नओवर सीमा से ऊपर के व्यवसायों को पंजीकरण कराना आवश्यक है: वस्तुओं के लिए ₹40 लाख और सेवाओं के लिए ₹20 लाख, कुछ राज्यों में कम सीमाओं के साथ। मुख्य कर स्लैब 5%, 12%, 18% और 28% हैं।",
+      "sources": [
+        {
+          "source": "gst.md",
+          "content": "The Goods and Services Tax (GST) is a comprehensive, multi-stage, destination-based tax levied on every value addition, introduced in India on 1 July 2017. It subsumed multiple indirect taxes such as VAT, service tax, and excise duty. Slabs: the main tax slabs are 5%, 12%, 18%, and 28%. Registration: businesses above the turnover threshold must register (Rs 40 lakh for goods and Rs 20 lakh for services, with lower thresholds in some states)."
+        }
+      ]
+    },
+    {
+      "id": "generic",
+      "keywords": [],
+      "answer": "This question is outside the pre-made demo topics, and the live Groq answer service is not configured or is currently unavailable, so no retrieval or LLM answer could be produced. The demo fallback covers PM-KISAN, Ayushman Bharat PM-JAY, PMAY-G, PM-SYM, Startup India, and GST. Add a valid GROQ_API_KEY and restart the API to enable live RAG answers.",
+      "answer_hi": "यह प्रश्न पहले से बनाए गए डेमो विषयों से बाहर है, और लाइव ग्रूक उत्तर सेवा कॉन्फ़िगर नहीं है या अभी उपलब्ध नहीं है, इसलिए कोई रिट्रीवल या एलएलएम उत्तर नहीं बनाया जा सका। डेमो फॉलबैक पीएम-किसान, आयुष्मान भारत पीएम-जय, पीएमएवाई-जी, पीएम-एसवाईएम, स्टार्टअप इंडिया और जीएसटी को कवर करता है। लाइव आरएजी उत्तर सक्षम करने के लिए एक मान्य GROQ_API_KEY जोड़ें और API को पुनः आरंभ करें।",
+      "notice_hi": "डेमो फॉलबैक मोड: लाइव ग्रूक उत्तर सेवा उपलब्ध नहीं है, इसलिए यह एक पहले से बनाया गया सामान्य डेमो उत्तर है।",
+      "sources": []
+    }
+  ]
+}

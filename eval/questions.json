@@ -1,0 +1,59 @@
+[
+  {
+    "question": "What health insurance cover does Ayushman Bharat PM-JAY provide per family per year?",
+    "reference": "Ayushman Bharat PM-JAY provides a health cover of \u20b95 lakh per family per year, on a floater basis, for secondary and tertiary hospitalisation."
+  },
+  {
+    "question": "When was GST introduced in India and which indirect taxes did it subsume?",
+    "reference": "GST was introduced in India on 1 July 2017. It subsumed multiple indirect taxes such as VAT, service tax, and excise duty."
+  },
+  {
+    "question": "What is the GST registration turnover threshold for goods and for services?",
+    "reference": "Businesses above the turnover threshold must register for GST: \u20b940 lakh for goods and \u20b920 lakh for services, with lower thresholds in some states."
+  },
+  {
+    "question": "How much income support does PM-KISAN provide and in what instalments is it paid?",
+    "reference": "PM-KISAN provides \u20b96,000 per year to eligible landholding farmer families, paid directly into their bank accounts through Direct Benefit Transfer (DBT) in three equal instalments of \u20b92,000 each, released every four months."
+  },
+  {
+    "question": "Who is excluded from receiving PM-KISAN benefits?",
+    "reference": "Excluded from PM-KISAN are institutional landholders, farmer families where any member pays income tax, and families with a government employee in a higher grade."
+  },
+  {
+    "question": "What monthly pension does PM-SYM provide and at what age does it start?",
+    "reference": "PM-SYM provides a monthly pension of \u20b93,000 after the subscriber attains the age of 60 years; the entry age is 18 to 40 years."
+  },
+  {
+    "question": "How much financial assistance does PMAY-G provide for building a pucca house?",
+    "reference": "PMAY-G provides financial assistance of \u20b91.20 lakh per house in plain areas and \u20b91.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts."
+  },
+  {
+    "question": "What are the eligibility conditions for DPIIT startup recognition under Startup India?",
+    "reference": "An entity must be incorporated as a private limited company, LLP, or registered partnership, be less than 10 years old, and have a turnover of up to \u20b9100 crore in any financial year."
+  },
+  {
+    "question": "What is the current exchange rate of Bitcoin to the Indian rupee?",
+    "reference": "This question is out of scope for SchemeGPT: the provided context contains no information about cryptocurrency exchange rates, so the answer should state that the information is not available."
+  },
+  {
+    "question": "Which jurisdictions does the SchemeGPT directory cover, and what does a state or union territory entry tell a citizen?",
+    "reference": "The SchemeGPT directory covers 36 jurisdictions: 28 states and 8 union territories. Each state/UT entry is a directory_seed discovery entry: it maps the jurisdiction for scheme search and links to the official national MyScheme discovery portal, but it is not a verified scheme-level eligibility decision."
+  },
+  {
+    "question": "I am a 35-year-old unorganised worker earning about 12,000 rupees per month in rural Karnataka. Which central pension scheme could match my profile?",
+    "profile": {
+      "state": "Karnataka",
+      "age": 35,
+      "annual_income": 150000,
+      "occupation": "unorganised worker",
+      "rural": true,
+      "goals": ["pension", "social security"]
+    },
+    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; a 35-year-old unorganised worker earning about Rs 12,000 per month is within the documented entry age and income band. The Karnataka directory seed is a discovery entry, not a verified eligibility decision."
+  },
+  {
+    "question": "पीएम-किसान के तहत पात्र किसान परिवारों को प्रति वर्ष कितनी आय सहायता मिलती है और यह कितनी किश्तों में दी जाती है?",
+    "language": "hi",
+    "reference": "पीएम-किसान के तहत पात्र भूमिधारी किसान परिवारों को प्रति वर्ष ₹6,000 की आय सहायता मिलती है, जो डीबीटी द्वारा सीधे उनके बैंक खाते में ₹2,000 की तीन समान किश्तों में दी जाती है, और हर चार महीने में एक किश्त जारी की जाती है।"
+  }
+]

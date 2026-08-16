@@ -1,0 +1,12 @@
+.env
+__pycache__/
+.venv/
+data/.cache/
+.playwright-mcp/
+
+# Evaluation outputs (eval/results/):
+#   - report.md is the publishable Markdown report and IS tracked.
+#   - *.json / *.csv are transient machine-readable artifacts that change on
+#     every run and are intentionally NOT tracked.
+eval/results/*.json
+eval/results/*.csv

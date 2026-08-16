@@ -1,0 +1,62 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scheme
+      POSTGRES_PASSWORD: scheme
+      POSTGRES_DB: schemegpt
+    volumes:
+      # Vector store persistence: survives `docker compose down`; only
+      # `down -v` deletes it.
+      - pgdata:/var/lib/postgresql/data
+    # PostgreSQL is NOT published to the host: only the api container reaches
+    # it over the internal docker network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scheme -d schemegpt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Bind to localhost only: the web container reaches the API over the
+      # internal docker network (http://api:8000), and the docs remain
+      # available on the machine running the stack (localhost) or via an SSH
+      # tunnel. See README "Deployment on a free VPS" -> Verify.
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      # Uses only the Python stdlib already present in python:3.12-slim, so no
+      # extra tools (curl/wget) are needed in the image.
+      # The long start_period absorbs first-start embedding model download and
+      # auto-ingestion before the API is declared unhealthy.
+      test: ["CMD", "python", "-c", "import json,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8000/health', timeout=5)); assert d.get('status')=='ok'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 300s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    restart: unless-stopped
+    environment:
+      STREAMLIT_API_URL: http://api:8000
+    depends_on:
+      # Start only once the API is actually healthy, so the UI never comes up
+      # against a dead backend.
+      api:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+
+volumes:
+  pgdata:
