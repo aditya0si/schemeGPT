@@ -27,7 +27,7 @@ from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from sqlalchemy import text
 
 from app.catalog import load_schemes_by_source, load_states_catalog, slugify
-from app.config import ROOT_DIR, data_dir_path
+from app.config import ROOT_DIR, data_dir_path, settings
 from app.db import COLLECTION_NAME, get_engine, get_vectorstore
 
 logger = logging.getLogger(__name__)
@@ -211,4 +211,9 @@ def ingest(data_dir: Path | None = None) -> int:
     if texts:
         get_vectorstore().add_texts(texts=texts, metadatas=metadatas, ids=ids)
     _update_chunk_metadata(metadata_updates)
+    # Record which embedding model produced this collection's vectors so
+    # startup can warn when the configured model changes (see app.db).
+    from app.db import record_embedding_model
+
+    record_embedding_model(settings.embedding_model)
     return total_chunks

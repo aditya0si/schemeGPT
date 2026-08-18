@@ -8,7 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 class Settings(BaseSettings):
     groq_api_key: str = ""
     database_url: str = "postgresql+psycopg2://scheme:scheme@localhost:5432/schemegpt"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = "intfloat/multilingual-e5-small"
     groq_model: str = "llama-3.3-70b-versatile"
     data_dir: str = "data/schemes"
     # Admin token required for POST /ingest via the X-Admin-Token header.

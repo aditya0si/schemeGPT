@@ -1,3 +1,4 @@
+import logging
 import secrets
 from contextlib import asynccontextmanager
 
@@ -47,6 +48,21 @@ async def lifespan(app: FastAPI):
     profiles.init_table()
     if count_vectors() == 0:
         ingest.ingest()
+    else:
+        # Vectors exist: verify they were embedded by the CONFIGURED model.
+        # Vectors from a different model are silently wrong (incomparable
+        # spaces); warn loudly instead of auto-deleting anything.
+        from app.db import stored_embedding_model
+
+        recorded = stored_embedding_model()
+        if recorded is not None and recorded != settings.embedding_model:
+            logging.getLogger(__name__).warning(
+                "Vector store was embedded with '%s' but the API is configured "
+                "for '%s'. Retrieval quality is degraded until the corpus is "
+                "re-embedded. Run: python scripts/reembed.py --yes",
+                recorded,
+                settings.embedding_model,
+            )
     yield
 
 
