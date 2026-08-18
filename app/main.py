@@ -226,8 +226,32 @@ async def query_stream(req: QueryRequest):
     Demo fallback semantics are identical to /query: labelled, HTTP 200,
     never a traceback.
     """
+    import time as _time
+
+    from app import metrics
+
+    start = _time.perf_counter()
+
+    async def _proxy():
+        try:
+            async for part in stream_answer(
+                req.question, req.language, req.profile
+            ):
+                yield part
+        finally:
+            metrics.observe_latency((_time.perf_counter() - start) * 1000)
+
     return StreamingResponse(
-        stream_answer(req.question, req.language, req.profile),
+        _proxy(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/metrics")
+def metrics_endpoint():
+    """Aggregate in-process counters + latency percentiles (no per-request data,
+    no PII — safe to expose)."""
+    from app import metrics
+
+    return metrics.snapshot()

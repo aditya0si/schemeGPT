@@ -19,6 +19,7 @@ from typing import AsyncIterator
 
 import anyio
 
+from app import metrics
 from app.agent import needs_multi_step, run_agent_gather
 from app.rag import (
     _build_profile_context,
@@ -73,6 +74,7 @@ async def stream_answer(
         # Fail fast (no key -> ValueError) before touching the DB.
         get_llm()
         if needs_multi_step(question, profile):
+            metrics.inc("agent_routes_total")
             try:
                 docs, steps = await anyio.to_thread.run_sync(
                     run_agent_gather, question, lang, profile
@@ -115,9 +117,11 @@ async def stream_answer(
         verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
+        metrics.inc("queries_live")
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:
         if tokens_sent:
+            metrics.inc("stream_midstream_failures")
             logger.error(
                 "Live stream failed mid-answer (%s).", type(exc).__name__
             )
@@ -143,6 +147,7 @@ async def stream_answer(
         demo_verified = verify_quotes(parse_quotes(demo["answer"]), demo["sources"])
         if demo_verified:
             yield _sse("quotes", [q.__dict__ for q in demo_verified])
+        metrics.inc("queries_demo")
         yield _sse(
             "done",
             {"mode": "demo", "notice": demo["notice"], "language": lang},

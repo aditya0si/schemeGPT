@@ -19,7 +19,8 @@ class _FakeLLM:
 
 def test_normalize_returns_cleaned_question(monkeypatch):
     fake = _FakeLLM("  What income support does PM-KISAN provide per year?  ")
-    monkeypatch.setattr(rag, "get_llm", lambda: fake)
+    # normalize now routes via get_llm("fast", max_tokens=160).
+    monkeypatch.setattr(rag, "get_llm", lambda *a, **k: fake)
     out = rag.normalize_question("pm kisan me kitna paisa milta hai")
     assert out == "What income support does PM-KISAN provide per year?"
 

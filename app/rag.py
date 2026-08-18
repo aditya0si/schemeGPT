@@ -166,7 +166,13 @@ def _normalize_language(language: str | None) -> str:
     return "en"
 
 
-def get_llm() -> ChatGroq:
+def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
+    """Return a Groq ChatGroq instance for a task role.
+
+    ``role="fast"`` uses the cheap fast model for small sub-tasks (question
+    normalization, routing); ``"answer"``/``"agent"`` use the strong model for
+    final answers and reasoning. ``max_tokens`` bounds every generation.
+    """
     key = settings.groq_api_key
     if not key.strip():
         # Fail fast so no ChatGroq call is ever attempted without a key.
@@ -174,14 +180,17 @@ def get_llm() -> ChatGroq:
             "GROQ_API_KEY is not set. Set a valid Groq API key to enable live "
             "RAG answers, or leave it blank to use the pre-made demo."
         )
+    model = (
+        settings.groq_fast_model if role == "fast" else settings.groq_model
+    )
     return ChatGroq(
-        model=settings.groq_model,
+        model=model,
         api_key=key,
         temperature=0,
         # Bound every live Groq generation so a public free-tier answer can
         # never consume unbounded output tokens. langchain-groq (pinned 0.3.5)
         # accepts this as a standard init arg.
-        max_tokens=1024,
+        max_tokens=max_tokens,
     )
 
 
@@ -197,13 +206,12 @@ NORMALIZE_SYSTEM_PROMPT = (
 def normalize_question(question: str) -> str:
     """Rewrite a raw citizen question into a clean retrieval query.
 
-    One cheap LLM call, temperature 0, tightly bounded. ANY failure (no key,
-    API error, empty or oversized output) falls back to the raw question so
-    retrieval always proceeds.
+    One cheap LLM call (fast model), temperature 0, tightly bounded. ANY
+    failure (no key, API error, empty or oversized output) falls back to the
+    raw question so retrieval always proceeds.
     """
     try:
-        llm = get_llm()
-        llm.temperature = 0
+        llm = get_llm("fast", max_tokens=160)
         resp = llm.invoke(
             [("system", NORMALIZE_SYSTEM_PROMPT), ("human", question)]
         )
