@@ -6,13 +6,23 @@ A domain RAG question-answering platform over Indian government schemes and acts
 
 - **API**: FastAPI + uvicorn (`app/`) with endpoints: `/health`, `/query`,
   `/states`, `/profiles`, `/recommendations`, `/coverage`, plus protected
-  `POST /ingest` (requires the `X-Admin-Token` header).
-- **Vector store**: pgvector (`pgvector/pgvector:pg16`) storing 384-dim embeddings from `all-MiniLM-L6-v2`.
-- **Retrieval chain**: LangChain built-ins `create_retrieval_chain` + `create_stuff_documents_chain`.
-- **LLM**: `ChatGroq` with `llama-3.3-70b-versatile` (the only external API call; free tier).
+  `POST /ingest` (requires the `X-Admin-Token` header), the streaming
+  `POST /query/stream` (SSE), and `GET /metrics` (observability).
+- **Vector store**: pgvector (`pgvector/pgvector:pg16`) storing 384-dim
+  embeddings from a multilingual E5 model (English + Hindi + Hinglish).
+- **Retrieval chain**: hybrid retrieval — pgvector cosine fused with Postgres
+  full-text via Reciprocal Rank Fusion, optional cross-encoder rerank — plus
+  a tool-calling agent for comparative/profile questions.
+- **LLM**: `ChatGroq` with `llama-3.3-70b-versatile` (answers) and
+  `llama-3.1-8b-instant` (normalization/routing) — Groq free tier.
 - **Embeddings**: `sentence-transformers`, fully local and free.
-- **Demo**: Streamlit chat UI (`streamlit_app.py`).
-- **Deployment**: Docker Compose (database, API, web).
+- **Demo**: Streamlit chat UI (`streamlit_app.py`) + a new engineered-editorial
+  Next.js UI (`web/`, port 3000).
+- **Deployment**: Docker Compose (database, API, web, streamlit).
+
+> **AI engineering deep-dive:** the RAG pipeline, streaming protocol, quote
+> verification, evaluation harness, and the techniques behind them are
+> documented in [`docs/AI-ENGINEERING.md`](docs/AI-ENGINEERING.md).
 
 ## Quickstart (Docker)
 
