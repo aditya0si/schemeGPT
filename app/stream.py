@@ -19,6 +19,7 @@ from typing import AsyncIterator
 
 import anyio
 
+from app.agent import needs_multi_step, run_agent_gather
 from app.rag import (
     _build_profile_context,
     _normalize_language,
@@ -71,12 +72,31 @@ async def stream_answer(
     try:
         # Fail fast (no key -> ValueError) before touching the DB.
         get_llm()
-        normalized = await anyio.to_thread.run_sync(
-            normalize_question, question
-        )
-        docs = await anyio.to_thread.run_sync(
-            lambda: get_retriever().invoke(normalized)
-        )
+        if needs_multi_step(question, profile):
+            try:
+                docs, steps = await anyio.to_thread.run_sync(
+                    run_agent_gather, question, lang, profile
+                )
+            except Exception as exc:
+                # Agent loop failed: degrade to single-shot retrieval rather
+                # than dropping to demo mode for a live-configured stack.
+                logger.warning("Agent retrieval failed (%s); single-shot path.", type(exc).__name__)
+                normalized = await anyio.to_thread.run_sync(
+                    normalize_question, question
+                )
+                docs = await anyio.to_thread.run_sync(
+                    lambda: get_retriever().invoke(normalized)
+                )
+                steps = []
+            for step in steps:
+                yield _sse("step", step)
+        else:
+            normalized = await anyio.to_thread.run_sync(
+                normalize_question, question
+            )
+            docs = await anyio.to_thread.run_sync(
+                lambda: get_retriever().invoke(normalized)
+            )
         yield _sse("sources", [_source_dict(doc) for doc in docs])
         chain = build_answer_chain(lang)
         async for chunk in chain.astream(

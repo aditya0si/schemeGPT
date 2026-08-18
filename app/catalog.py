@@ -23,6 +23,26 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
 
 
+# Known scheme name/acronym variants used by the agentic router to decide
+# whether a question benefits from multi-step retrieval (>=2 mentions).
+SCHEME_NAME_VARIANTS = (
+    "pm-kisan", "pm kisan", "kisan samman nidhi",
+    "pradhan mantri kisan samman nidhi",
+    "pmay-g", "pmay g", "pmayg", "gramin aawas", "gramin awas",
+    "pradhan mantri awas yojana gramin",
+    "pm-sym", "pm sym", "shram yogi maandhan",
+    "pradhan mantri shram yogi maandhan",
+    "ayushman bharat", "ayushman", "pm-jay", "pm jay",
+    "startup india", "dpiit",
+    "gst", "goods and services tax",
+)
+
+
+def scheme_name_variants() -> tuple[str, ...]:
+    """Scheme name/acronym variants for agentic routing. Lowercased tuple."""
+    return SCHEME_NAME_VARIANTS
+
+
 def normalize_name(name: str) -> str:
     """Punctuation-insensitive state/UT name normalization.
 

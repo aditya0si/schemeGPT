@@ -12,12 +12,15 @@ type Quote = {
   matched_source?: string | null;
 };
 
+type Step = { tool: string; summary: string };
+
 type Msg = {
   role: "user" | "assistant";
   text: string;
   streaming?: boolean;
   sources?: Source[];
   quotes?: Quote[];
+  steps?: Step[];
   mode?: "live" | "demo";
   notice?: string | null;
   error?: string;
@@ -103,6 +106,11 @@ export function Chat() {
             }));
           else if (event === "quotes")
             patch((a) => ({ ...a, quotes: data as Quote[] }));
+          else if (event === "step")
+            patch((a) => ({
+              ...a,
+              steps: [...(a.steps ?? []), data as Step],
+            }));
           else if (event === "error")
             patch((a) => ({
               ...a,
@@ -162,6 +170,15 @@ export function Chat() {
               >
                 {m.text}
               </p>
+              {m.steps && m.steps.length > 0 ? (
+                <ul className="mb-2 space-y-1">
+                  {m.steps.map((s, j) => (
+                    <li key={j} className="font-mono text-[11px] text-ink/50">
+                      ⇄ {s.tool} — {s.summary}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {m.error ? (
                 <p className="border border-signal px-3 py-2 font-mono text-[11px] uppercase text-signal">
                   {m.error}{" "}
