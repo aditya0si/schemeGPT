@@ -63,6 +63,10 @@ async def lifespan(app: FastAPI):
                 recorded,
                 settings.embedding_model,
             )
+    # Full-text search index for hybrid retrieval (idempotent, non-fatal).
+    from app.db import ensure_fts_index
+
+    ensure_fts_index()
     yield
 
 

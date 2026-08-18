@@ -90,3 +90,38 @@ def stored_embedding_model() -> str | None:
         except (TypeError, ValueError):
             value = {}
     return value.get("embedding_model")
+
+
+@lru_cache
+def get_retriever():
+    """Hybrid retriever (vector + full-text, optional rerank) used by /query
+    and /query/stream. Imported lazily to avoid an import cycle."""
+    from app.retrieval import HybridRetriever
+
+    return HybridRetriever()
+
+
+def ensure_fts_index() -> None:
+    """Idempotently add the full-text ``tsvector`` column + GIN index.
+
+    Runs at startup after ingestion so the table exists. Failures (fresh DB
+    without tables, older driver) are logged and non-fatal: full-text search
+    simply falls back to vector-only.
+    """
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE langchain_pg_embedding "
+                    "ADD COLUMN IF NOT EXISTS tsv tsvector "
+                    "GENERATED ALWAYS AS (to_tsvector('english', document)) STORED"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_lpe_tsv "
+                    "ON langchain_pg_embedding USING GIN (tsv)"
+                )
+            )
+    except Exception:
+        logger.warning("Could not ensure full-text index; vector-only retrieval.", exc_info=True)

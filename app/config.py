@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://scheme:scheme@localhost:5432/schemegpt"
     embedding_model: str = "intfloat/multilingual-e5-small"
     groq_model: str = "llama-3.3-70b-versatile"
+    # Small, fast model for cheap sub-tasks (normalization, routing).
+    groq_fast_model: str = "llama-3.1-8b-instant"
+    # Optional cross-encoder rerank stage (BAAI/bge-reranker-base, ~2 GB on
+    # CPU). Keep OFF on small free-tier VPSes; retrieval still fuses vector +
+    # full-text without it.
+    enable_reranker: bool = False
     data_dir: str = "data/schemes"
     # Admin token required for POST /ingest via the X-Admin-Token header.
     # Leave blank to disable manual re-ingestion (startup auto-ingestion is
