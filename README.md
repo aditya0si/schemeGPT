@@ -1,28 +1,189 @@
-# SchemeGPT
+# SchemeGPT 🇮🇳
 
-A domain RAG question-answering platform over Indian government schemes and acts.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
+[![pgvector](https://img.shields.io/badge/pgvector-PostgreSQL%2016-336791.svg)](https://github.com/pgvector/pgvector)
+[![Groq Llama-3.3](https://img.shields.io/badge/LLM-Groq%20Llama--3.3--70b-orange.svg)](https://groq.com/)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
+[![RAGAS Evaluation](https://img.shields.io/badge/Eval-RAGAS%200.2.15-green.svg)](https://github.com/explodinggradients/ragas)
 
-## Architecture
+> **SchemeGPT** is a production-grade, domain-specific Retrieval-Augmented Generation (RAG) and decision-support platform for Indian Government Schemes, Central Acts, and State/UT Public Welfare Directories. It features hybrid vector/full-text search, quote-verified answer generation, profile-tailored recommendations, multi-step retrieval agents, and bilingual support (English & Hindi).
 
-- **API**: FastAPI + uvicorn (`app/`) with endpoints: `/health`, `/query`,
-  `/states`, `/profiles`, `/recommendations`, `/coverage`, plus protected
-  `POST /ingest` (requires the `X-Admin-Token` header), the streaming
-  `POST /query/stream` (SSE), and `GET /metrics` (observability).
-- **Vector store**: pgvector (`pgvector/pgvector:pg16`) storing 384-dim
-  embeddings from a multilingual E5 model (English + Hindi + Hinglish).
-- **Retrieval chain**: hybrid retrieval — pgvector cosine fused with Postgres
-  full-text via Reciprocal Rank Fusion, optional cross-encoder rerank — plus
-  a tool-calling agent for comparative/profile questions.
-- **LLM**: `ChatGroq` with `llama-3.3-70b-versatile` (answers) and
-  `llama-3.1-8b-instant` (normalization/routing) — Groq free tier.
-- **Embeddings**: `sentence-transformers`, fully local and free.
-- **Demo**: Streamlit chat UI (`streamlit_app.py`) + a new engineered-editorial
-  Next.js UI (`web/`, port 3000).
-- **Deployment**: Docker Compose (database, API, web, streamlit).
+---
 
-> **AI engineering deep-dive:** the RAG pipeline, streaming protocol, quote
-> verification, evaluation harness, and the techniques behind them are
-> documented in [`docs/AI-ENGINEERING.md`](docs/AI-ENGINEERING.md).
+## 📌 Keywords & Technical Domain Tags
+
+`RAG` · `Retrieval-Augmented Generation` · `AI Engineering` · `pgvector` · `Reciprocal Rank Fusion (RRF)` · `FastAPI` · `Next.js 15` · `Streamlit` · `Groq Llama-3.3` · `LangChain` · `Sentence-Transformers` · `Indian Government Schemes` · `MyScheme India` · `Public Welfare AI` · `SSE Streaming` · `Quote Verification` · `RAGAS Offline Evaluation` · `Multi-Step Tool-Calling Agent` · `Bilingual NLP (English + Hindi)` · `Docker Compose`
+
+---
+
+## 📑 Table of Contents
+
+- [Overview](#overview)
+- [Key Features & Capabilities](#key-features--capabilities)
+- [System Architecture & RAG Pipeline](#system-architecture--rag-pipeline)
+- [Tech Stack](#tech-stack)
+- [Repository Structure](#repository-structure)
+- [Quickstart (Docker)](#quickstart-docker)
+- [Iteration Highlights](#iteration-highlights)
+  - [Nationwide Discovery & Profiles](#iteration-1-nationwide-discovery-saved-profiles-recommendations)
+  - [Honest Coverage & Protected Ingestion](#iteration-4-honest-coverage-verified-data-workflow-protected-ingestion)
+- [API Endpoints Summary](#api-endpoints-summary)
+- [Local Development](#local-development)
+- [Groq API Key & Demo Fallback](#groq_api_key)
+- [Evaluation Suite (RAGAS)](#evaluation)
+- [Deployment Guide (Free VPS)](#deployment-on-a-free-vps)
+- [Smoke Verification](#smoke-check)
+- [Operational Warnings & Disclaimers](#operational-warnings)
+
+---
+
+## Overview
+
+Navigating Indian central and state government schemes (such as PM-KISAN, Ayushman Bharat PM-JAY, PMAY-G, PM-SYM, and Startup India) often poses challenges due to fragmented eligibility criteria, disparate official portals, and language barriers. 
+
+**SchemeGPT** addresses this challenge through an engineered RAG workflow:
+1. **Honest Coverage & Citation Integrity**: Answers include verified source quotes and official portal links; claims are cross-checked against indexed documents.
+2. **Hybrid Vector + Full-Text Search**: Combines 384-dimensional dense semantic embeddings (`sentence-transformers/all-MiniLM-L6-v2`) via `pgvector` with PostgreSQL Full-Text Search using Reciprocal Rank Fusion (RRF).
+3. **Multi-Step Agentic Retrieval**: Tool-calling agents handle complex, multi-scheme, comparative, or profile-dependent queries.
+4. **Bilingual Citizen Support**: Full English and Hindi search, recommendation, and streaming UI support.
+5. **Deterministic Recommendation Engine**: Matches citizens to applicable central and state programs based on profile parameters (age, occupation, income, location, goals).
+
+---
+
+## Key Features & Capabilities
+
+| Feature | Description |
+| :--- | :--- |
+| **Hybrid RRF Search** | Cosine similarity vector retrieval fused with PostgreSQL `tsvector/tsquery` keyword search using Reciprocal Rank Fusion. |
+| **Quote Verification** | Sub-string quote verification ensuring LLM generated claims cite precise text from ingested scheme Markdown documents. |
+| **Tool-Calling Agent** | Handles comparative queries (e.g., "Compare PM-KISAN vs PM-SYM pension benefits") via multi-step retrieval tools. |
+| **Profile & Recommendations** | Deterministic profile-matching engine (`/recommendations`) and privacy-preserving saved profiles with token hashes (`/profiles`). |
+| **SSE Streaming** | Real-time token streaming (`POST /query/stream`) over Server-Sent Events with inline metadata & verification step events. |
+| **RAGAS Evaluation Gate** | Automated offline evaluation measuring `faithfulness` and `answer_relevancy` with automated regression floors. |
+| **Dual User Interface** | High-performance modern Next.js 15 editorial web portal (`web/`) + lightweight Streamlit interactive demo (`streamlit_app.py`). |
+| **Resilient Demo Mode** | Zero-downtime fallback mode producing clearly-labelled demo responses when external LLM keys are absent or rate-limited. |
+
+---
+
+## System Architecture & RAG Pipeline
+
+```mermaid
+flowchart TD
+    subgraph Clients["User Interfaces"]
+        UI_Web["Next.js 15 Web Portal (Port 3000)"]
+        UI_Streamlit["Streamlit Chat Demo (Port 8501)"]
+    end
+
+    subgraph API["FastAPI Backend (app/)"]
+        EP_Query["POST /query & /query/stream"]
+        EP_Rec["POST /recommendations"]
+        EP_Prof["POST/GET /profiles"]
+        EP_Cov["GET /coverage & /states"]
+        Agent["Multi-Step Agent / RAG Chain"]
+        RRF["Reciprocal Rank Fusion (RRF)"]
+    end
+
+    subgraph Engine["LLM & Embeddings"]
+        Groq["ChatGroq (llama-3.3-70b / llama-3.1-8b)"]
+        ST["Sentence-Transformers (384-dim)"]
+    end
+
+    subgraph Storage["PostgreSQL 16 + pgvector"]
+        VecStore["pgvector Cosine Search"]
+        FTS["Postgres Full-Text Index (tsvector)"]
+        ProfileDB["Saved Profiles & Token Hashes"]
+    end
+
+    UI_Web --> EP_Query & EP_Rec & EP_Prof & EP_Cov
+    UI_Streamlit --> EP_Query & EP_Rec & EP_Prof & EP_Cov
+
+    EP_Query --> Agent
+    Agent --> ST
+    ST --> VecStore
+    Agent --> RRF
+    RRF --> VecStore & FTS
+    Agent --> Groq
+    Groq --> EP_Query
+    EP_Prof --> ProfileDB
+```
+
+> **AI Engineering Deep-Dive:** The complete technical specification of the RAG pipeline, streaming protocol, quote verification algorithms, evaluation harness, and design trade-offs are documented in [`docs/AI-ENGINEERING.md`](docs/AI-ENGINEERING.md).
+
+---
+
+## Tech Stack
+
+- **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+), Uvicorn, Pydantic v2
+- **Vector Store & DB**: [PostgreSQL 16](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) extension
+- **LLM Engine**: [Groq API](https://console.groq.com/) using `llama-3.3-70b-versatile` for synthesis and `llama-3.1-8b-instant` for routing/normalization
+- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions, local PyTorch CPU execution)
+- **Frontend Applications**: 
+  - **Next.js 15**: Tailwind CSS, TypeScript, React 19 (`web/`)
+  - **Streamlit**: Python Chat UI (`streamlit_app.py`)
+- **Evaluation Framework**: [RAGAS 0.2.15](https://github.com/explodinggradients/ragas) + custom evaluation harness (`eval/run_eval.py`)
+- **Containerization**: Docker, Docker Compose
+
+---
+
+## Repository Structure
+
+```
+SchemeGPT/
+├── app/                      # FastAPI Backend Application
+│   ├── main.py               # API endpoints, FastAPI router, CORS & metrics
+│   ├── rag.py                # Core RAG pipeline, prompt templates & ChatGroq integration
+│   ├── retrieval.py          # Hybrid pgvector + Postgres Full-Text Search (RRF)
+│   ├── agent.py              # Multi-step tool-calling comparative retrieval agent
+│   ├── recommend.py          # Deterministic scheme recommendation engine
+│   ├── profiles.py           # Saved citizen profile storage & security
+│   ├── ingest.py             # Idempotent document ingestion & vector chunking
+│   ├── stream.py             # Server-Sent Events (SSE) streaming handler
+│   ├── quotes.py             # Sub-string quote verification & source mapping
+│   ├── db.py                 # Postgres connection pool & pgvector setup
+│   └── config.py             # Environment configuration & Pydantic settings
+├── data/                     # Ingested Knowledge Base
+│   ├── schemes/*.md          # Verified central scheme records (PM-KISAN, PM-JAY, etc.)
+│   ├── states/*.md           # 36 State / UT directory seed markdown records
+│   ├── scheme_catalog.json   # Catalog metadata & eligibility tags
+│   └── india_states.json     # Official state/UT directory mapping
+├── web/                      # Next.js 15 Web Portal Application
+├── streamlit_app.py          # Interactive Streamlit Demo Chat Application
+├── eval/                     # RAGAS Evaluation Suite
+│   ├── run_eval.py           # Evaluation runner with quality thresholds & reporting
+│   └── questions.json        # Curated test evaluation dataset (English + Hindi)
+├── docs/                     # Documentation & Specifications
+│   ├── AI-ENGINEERING.md     # In-depth architectural & RAG design guide
+│   └── data-operations.md    # Scheme catalog curation & verification workflow
+├── scripts/                  # Helper scripts
+│   └── validate_data.py      # Dependency-free schema & directory validator
+├── Dockerfile                # API container multi-stage build
+├── docker-compose.yml        # Multi-container orchestration (DB, API, Web, Streamlit)
+├── requirements.txt          # Production Python dependencies
+└── README.md                 # Primary documentation
+```
+
+---
+
+## API Endpoints Summary
+
+| Endpoint | Method | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET /health` | `GET` | System health check and status verification. | None |
+| `POST /query` | `POST` | Primary RAG question-answering endpoint returning verified answers and source quotes. | None |
+| `POST /query/stream` | `POST` | SSE real-time streaming RAG answer output with step events. | None |
+| `GET /states` | `GET` | List all 36 Indian States and Union Territories directory records. | None |
+| `GET /coverage` | `GET` | Report total catalog coverage (verified schemes vs directory seeds). | None |
+| `POST /recommendations`| `POST` | Generate profile-matched scheme recommendations deterministically. | None |
+| `POST /profiles` | `POST` | Create a saved citizen profile and receive an access token. | None |
+| `GET /profiles/{id}` | `GET` | Retrieve saved citizen profile by ID. | Header: `X-Profile-Token` |
+| `PUT /profiles/{id}` | `PUT` | Update saved citizen profile. | Header: `X-Profile-Token` |
+| `DELETE /profiles/{id}`| `DELETE` | Delete saved citizen profile. | Header: `X-Profile-Token` |
+| `POST /ingest` | `POST` | Trigger re-ingestion of `data/schemes` & `data/states` vectors. | Header: `X-Admin-Token` |
+| `GET /metrics` | `GET` | Observability metrics (requests, latency, LLM call counts). | None |
+
+---
 
 ## Quickstart (Docker)
 
@@ -56,7 +217,9 @@ chunks only get their catalog metadata refreshed. The state directory is picked
 up automatically even when `DATA_DIR` still points at the old `data/schemes`
 value.
 
-## Iteration 1: nationwide discovery, saved profiles, recommendations
+## Iteration Highlights
+
+### Iteration 1: nationwide discovery, saved profiles, recommendations
 
 - **`GET /states`** - returns the 36 state/Union Territory directory records
   (28 states + 8 UTs) from `data/india_states.json` in stable order. Every
@@ -90,9 +253,9 @@ value.
 - Future seams: the profile `language` field accepts `en`/`hi` (Hindi UI later),
   and recommendation signals are ready to be replaced by scenario-based RAG.
 
-## Iteration 4: honest coverage, verified-data workflow, protected ingestion
+### Iteration 4: honest coverage, verified-data workflow, protected ingestion
 
-### Coverage transparency — `GET /coverage`
+#### Coverage transparency — `GET /coverage`
 
 `GET /coverage` returns a pure report over `data/india_states.json` and
 `data/scheme_catalog.json`:
@@ -110,7 +273,7 @@ value.
 ("36 jurisdictions mapped · 6 verified sample schemes · state directories
 expanding" in English and Hindi) and falls back to the static copy otherwise.
 
-### Verified-data workflow — `docs/` and `scripts/validate_data.py`
+#### Verified-data workflow — `docs/` and `scripts/validate_data.py`
 
 - **`docs/data-operations.md`** — the repeatable workflow: authoritative sources
   to prefer (official ministry/state portals and MyScheme), one Markdown file
@@ -135,7 +298,7 @@ expanding" in English and Hindi) and falls back to the static copy otherwise.
   or a catalog id/source file is duplicated. On success it prints a compact
   summary. It also parses every `*.json` under `data/` and `eval/`.
 
-### Protected ingestion and bounded inputs
+#### Protected ingestion and bounded inputs
 
 - `POST /ingest` requires the **`X-Admin-Token`** header matching `ADMIN_TOKEN`
   (compared with `secrets.compare_digest`; tokens are never logged). With no
@@ -150,7 +313,7 @@ expanding" in English and Hindi) and falls back to the static copy otherwise.
 - Live Groq answers are capped at **`max_tokens=1024`** (`app/rag.py`), so a
   public free-tier response can never consume unbounded output tokens.
 
-### Evaluation
+#### Evaluation
 
 `eval/questions.json` now also includes: a question about nationwide/state
 directory discovery, a **profile-aware** case (the harness passes an optional
@@ -431,23 +594,6 @@ curl http://localhost:8000/health   # expect {"status":"ok"}
 - Before any public production use, put the UI behind HTTPS (e.g. a reverse
   proxy with TLS) and add authentication.
 - Keep the OS packages and Docker updated.
-
-### 8. Troubleshooting
-
-- **API container unhealthy:** check `docker compose logs api`. On first start
-  the embedding model download / auto-ingestion can exceed the healthcheck's
-  `start_period` on slow connections - wait and re-check `docker compose ps`.
-- **Embedding / memory errors:** on low-memory instances the API is often
-  OOM-killed (check `dmesg | tail` or `journalctl`). Retry
-  `docker compose up -d --build` on a stable connection and confirm the VPS
-  has at least 2 GB RAM.
-- **Bad/blank key shows demo answers:** by design. Blank, invalid, rate-limited
-  or unavailable keys fall back to clearly-labelled demo responses. Set a valid
-  `GROQ_API_KEY` and `docker compose restart api` for live answers.
-- **Cannot reach the UI on 8501:** confirm the provider firewall *and* host
-  firewall allow 8501, that `docker compose ps` shows `streamlit` as running, and
-  that you use `http://<VPS_IP>:8501` (not https). The API on 8000 is bound to
-  localhost by design - use the SSH tunnel from step 5.
 
 ## Smoke check
 
