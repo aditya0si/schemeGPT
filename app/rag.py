@@ -31,6 +31,10 @@ from app.schemas import ProfileData
 
 logger = logging.getLogger(__name__)
 
+# Config fingerprint label for evaluation runs: bump when answer prompts
+# meaningfully change so score deltas can be attributed to a prompt version.
+PROMPT_VERSION = "2026-08-19-quotes"
+
 # Per-language system prompts (product voice). Answers must be grounded in
 # the provided context only, quote the exact supporting statement with its
 # source name and data_status, never invent quotes, keep scheme names,

@@ -46,10 +46,19 @@ RESULTS_DIR = EVAL_DIR / "results"
 QUESTIONS_FILE = EVAL_DIR / "questions.json"
 REPORT_FILE = RESULTS_DIR / "report.md"
 SCORES_FILE = RESULTS_DIR / "scores.json"
+HISTORY_FILE = RESULTS_DIR / "history.jsonl"
 
 # Single project-wide triage threshold. Any metric below this value (or
 # missing because of an evaluation error) flags a failure case.
 FAILURE_THRESHOLD = 0.70
+
+# Regression-gate floors (per aggre gate with --gate). Stricter than the
+# per-case triage threshold; failing a floor makes the command exit non-zero.
+GATE_FLOORS = {
+    "faithfulness": 0.85,
+    "answer_relevancy": 0.70,
+}
+GATE_METRICS = tuple(GATE_FLOORS)
 
 # Error recorded when app.rag.answer fell back to demo mode (a missing, invalid
 # or rate-limited Groq call returned a pre-made demo answer). Demo answers are
@@ -62,8 +71,27 @@ DEMO_FALLBACK_ERROR = (
 )
 
 # RAGAS 0.2.x metric names. `faithfulness` and `answer_relevancy` are the
-# 0.2.15 names; newer-only aliases are deliberately not used.
-METRICS = ("faithfulness", "answer_relevancy")
+# 0.2.15 names for the answer-quality metrics; `context_precision` and
+# `context_recall` score the retrieved-context quality against the reference.
+# Newer-only aliases are deliberately not used. Only answer-quality metrics
+# are gated; context metrics are reported for diagnosis.
+METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
+
+
+def check_gate(aggregates: dict) -> list[str]:
+    """Return a list of gate-floor failures for the given aggregate scores.
+
+    Pure and importable without RAGAS. A floor fails if the metric is missing
+    (None) or below its floor. Empty list means the gate passes.
+    """
+    failures: list[str] = []
+    for name, floor in GATE_FLOORS.items():
+        value = aggregates.get(name)
+        if value is None:
+            failures.append(f"{name}: missing (no score)")
+        elif value < floor:
+            failures.append(f"{name}: {value:.3f} < {floor:.2f}")
+    return failures
 
 # Parses the executor error records that RAGAS 0.2.x logs when a metric fails,
 # e.g. `Exception raised in Job[3]: AuthenticationError(invalid api key)`.
@@ -197,7 +225,12 @@ def _score_rows(rows: list[dict[str, Any]]) -> None:
     """Run RAGAS 0.2.15 synchronously with the app's Groq LLM + local embeddings."""
     from datasets import Dataset as HFDataset
     from ragas import evaluate
-    from ragas.metrics import answer_relevancy, faithfulness
+    from ragas.metrics import (
+        answer_relevancy,
+        context_precision,
+        context_recall,
+        faithfulness,
+    )
 
     from app.db import get_embeddings
     from app.rag import get_llm
@@ -220,7 +253,12 @@ def _score_rows(rows: list[dict[str, Any]]) -> None:
     try:
         result = evaluate(
             dataset=hf_dataset,
-            metrics=[faithfulness, answer_relevancy],
+            metrics=[
+                faithfulness,
+                answer_relevancy,
+                context_precision,
+                context_recall,
+            ],
             llm=get_llm(),
             embeddings=get_embeddings(),
             raise_exceptions=False,
@@ -341,6 +379,23 @@ def _write_report(
     for name in METRICS:
         lines.append(f"| {name} | {_fmt(aggregate[name])} |")
     lines.append("")
+
+    previous = _previous_aggregate()
+    if previous:
+        lines.append("## Delta vs previous run")
+        lines.append("")
+        lines.append("| Metric | This run | Previous | Delta |")
+        lines.append("| --- | --- | --- | --- |")
+        for name in METRICS:
+            now = aggregate.get(name)
+            then = previous.get(name)
+            if now is None or then is None:
+                lines.append(f"| {name} | {_fmt(now)} | {_fmt(then)} | n/a |")
+            else:
+                lines.append(
+                    f"| {name} | {_fmt(now)} | {_fmt(then)} | {now - then:+.3f} |"
+                )
+        lines.append("")
     lines.append("## Per-Question Scores")
     lines.append("")
     lines.append("| # | Question | faithfulness | answer_relevancy | Status |")
@@ -432,7 +487,57 @@ def _write_scores(
     )
 
 
-def run(limit: int | None = None) -> dict[str, Any]:
+def _config_fingerprint() -> dict:
+    """Which model/retriever configuration produced this run's scores."""
+    from app.config import settings
+    from app.rag import PROMPT_VERSION
+
+    return {
+        "prompt_version": PROMPT_VERSION,
+        "embedding_model": settings.embedding_model,
+        "groq_model": settings.groq_model,
+        "groq_fast_model": settings.groq_fast_model,
+        "reranker_enabled": settings.enable_reranker,
+        "retriever": "hybrid",
+    }
+
+
+def _append_history(
+    aggregate: dict, generated_at: str, limit: int | None
+) -> None:
+    """Append one JSON line per run; used for delta comparisons."""
+    try:
+        with HISTORY_FILE.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "generated_at": generated_at,
+                        "limit": limit,
+                        "config": _config_fingerprint(),
+                        "aggregate": aggregate,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    except Exception as exc:  # history is best-effort, never blocks a run
+        print(f"warning: could not write history: {type(exc).__name__}: {exc}")
+
+
+def _previous_aggregate() -> dict | None:
+    """Aggregate scores from the most recent completed run, if any."""
+    if not HISTORY_FILE.is_file():
+        return None
+    lines = [ln for ln in HISTORY_FILE.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    try:
+        return json.loads(lines[-1]).get("aggregate")
+    except (IndexError, json.JSONDecodeError):
+        return None
+
+
+def run(limit: int | None = None, gate: bool = False) -> dict[str, Any]:
     _ensure_project_on_path()
 
     from app.config import settings
@@ -475,12 +580,16 @@ def run(limit: int | None = None) -> dict[str, Any]:
         limit=limit,
     )
     _write_scores(cases, aggregate, generated_at, len(questions), limit)
+    _append_history(aggregate, generated_at, limit)
+
+    gate_failures = check_gate(aggregate) if gate else []
 
     return {
         "generated_at": generated_at,
         "cases_total": len(questions),
         "aggregate": aggregate,
         "failure_count": len(failure_cases),
+        "gate_failures": gate_failures,
         "report": str(REPORT_FILE),
         "scores": str(SCORES_FILE),
     }
@@ -500,12 +609,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Evaluate only the first N questions (cheap/free run). "
         "Default: all questions.",
     )
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="Fail (exit 1) if the aggregate gate floors are missed "
+        "(faithfulness >= 0.85, answer_relevancy >= 0.70).",
+    )
     args = parser.parse_args(argv)
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be a positive integer")
 
     try:
-        summary = run(limit=args.limit)
+        summary = run(limit=args.limit, gate=args.gate)
     except EvalError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -528,6 +643,11 @@ def main(argv: list[str] | None = None) -> int:
         f"Evaluation complete: {summary['cases_total']} case(s), "
         f"{summary['failure_count']} failure case(s)."
     )
+    if summary["gate_failures"]:
+        print("GATE FAILED:", file=sys.stderr)
+        for failure in summary["gate_failures"]:
+            print(f"  - {failure}", file=sys.stderr)
+        return 1
     print(f"Report: {summary['report']}")
     print(f"Scores: {summary['scores']}")
     return 0

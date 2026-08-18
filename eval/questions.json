@@ -47,13 +47,49 @@
       "annual_income": 150000,
       "occupation": "unorganised worker",
       "rural": true,
-      "goals": ["pension", "social security"]
+      "goals": [
+        "pension",
+        "social security"
+      ]
     },
     "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; a 35-year-old unorganised worker earning about Rs 12,000 per month is within the documented entry age and income band. The Karnataka directory seed is a discovery entry, not a verified eligibility decision."
   },
   {
-    "question": "पीएम-किसान के तहत पात्र किसान परिवारों को प्रति वर्ष कितनी आय सहायता मिलती है और यह कितनी किश्तों में दी जाती है?",
+    "question": "\u092a\u0940\u090f\u092e-\u0915\u093f\u0938\u093e\u0928 \u0915\u0947 \u0924\u0939\u0924 \u092a\u093e\u0924\u094d\u0930 \u0915\u093f\u0938\u093e\u0928 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u092a\u094d\u0930\u0924\u093f \u0935\u0930\u094d\u0937 \u0915\u093f\u0924\u0928\u0940 \u0906\u092f \u0938\u0939\u093e\u092f\u0924\u093e \u092e\u093f\u0932\u0924\u0940 \u0939\u0948 \u0914\u0930 \u092f\u0939 \u0915\u093f\u0924\u0928\u0940 \u0915\u093f\u0936\u094d\u0924\u094b\u0902 \u092e\u0947\u0902 \u0926\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948?",
     "language": "hi",
-    "reference": "पीएम-किसान के तहत पात्र भूमिधारी किसान परिवारों को प्रति वर्ष ₹6,000 की आय सहायता मिलती है, जो डीबीटी द्वारा सीधे उनके बैंक खाते में ₹2,000 की तीन समान किश्तों में दी जाती है, और हर चार महीने में एक किश्त जारी की जाती है।"
+    "reference": "\u092a\u0940\u090f\u092e-\u0915\u093f\u0938\u093e\u0928 \u0915\u0947 \u0924\u0939\u0924 \u092a\u093e\u0924\u094d\u0930 \u092d\u0942\u092e\u093f\u0927\u093e\u0930\u0940 \u0915\u093f\u0938\u093e\u0928 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u092a\u094d\u0930\u0924\u093f \u0935\u0930\u094d\u0937 \u20b96,000 \u0915\u0940 \u0906\u092f \u0938\u0939\u093e\u092f\u0924\u093e \u092e\u093f\u0932\u0924\u0940 \u0939\u0948, \u091c\u094b \u0921\u0940\u092c\u0940\u091f\u0940 \u0926\u094d\u0935\u093e\u0930\u093e \u0938\u0940\u0927\u0947 \u0909\u0928\u0915\u0947 \u092c\u0948\u0902\u0915 \u0916\u093e\u0924\u0947 \u092e\u0947\u0902 \u20b92,000 \u0915\u0940 \u0924\u0940\u0928 \u0938\u092e\u093e\u0928 \u0915\u093f\u0936\u094d\u0924\u094b\u0902 \u092e\u0947\u0902 \u0926\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948, \u0914\u0930 \u0939\u0930 \u091a\u093e\u0930 \u092e\u0939\u0940\u0928\u0947 \u092e\u0947\u0902 \u090f\u0915 \u0915\u093f\u0936\u094d\u0924 \u091c\u093e\u0930\u0940 \u0915\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948\u0964"
+  },
+  {
+    "question": "pm kisan ka paisa kab aata hai",
+    "reference": "PM-KISAN income support of Rs 6,000 per year is released in three equal instalments of Rs 2,000 each, every four months, by Direct Benefit Transfer (DBT)."
+  },
+  {
+    "question": "kisan ko sarkar har saal kitne rupaye deti hai",
+    "reference": "PM-KISAN provides income support of Rs 6,000 per year to eligible landholding farmer families in India, paid directly into their bank accounts through Direct Benefit Transfer (DBT)."
+  },
+  {
+    "question": "mera pension banao kaun sa scheme chune",
+    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; it provides a monthly pension of Rs 3,000 after the subscriber attains the age of 60 years."
+  },
+  {
+    "question": "\u092a\u0940\u090f\u092e-\u0936\u094d\u0930\u092e \u092f\u094b\u0917\u0940 \u092e\u093e\u0928\u0927\u0928 \u092f\u094b\u091c\u0928\u093e \u0915\u093f\u0924\u0928\u0940 \u092a\u0947\u0902\u0936\u0928 \u0926\u0947\u0924\u0940 \u0939\u0948 \u0914\u0930 \u0915\u093f\u0938 \u0909\u092e\u094d\u0930 \u092e\u0947\u0902 \u0936\u0941\u0930\u0942 \u0939\u094b\u0924\u0940 \u0939\u0948?",
+    "language": "hi",
+    "reference": "\u092a\u0940\u090f\u092e-\u0936\u094d\u0930\u092e \u092f\u094b\u0917\u0940 \u092e\u093e\u0928\u0927\u0928 (\u092a\u0940\u090f\u092e-\u090f\u0938\u0935\u093e\u0908\u090f\u092e) \u0905\u0938\u0902\u0917\u0920\u093f\u0924 \u0915\u094d\u0937\u0947\u0924\u094d\u0930 \u0915\u0947 \u0936\u094d\u0930\u092e\u093f\u0915\u094b\u0902 \u0915\u0947 \u0932\u093f\u090f \u092a\u0947\u0902\u0936\u0928 \u092f\u094b\u091c\u0928\u093e \u0939\u0948, \u091c\u094b \u0905\u092d\u093f\u0926\u093e\u0924\u093e \u0915\u0947 60 \u0935\u0930\u094d\u0937 \u0915\u0940 \u0906\u092f\u0941 \u092a\u0942\u0930\u0940 \u0915\u0930\u0928\u0947 \u092a\u0930 \u20b93,000 \u092e\u093e\u0938\u093f\u0915 \u092a\u0947\u0902\u0936\u0928 \u0926\u0947\u0924\u0940 \u0939\u0948; \u092a\u094d\u0930\u0935\u0947\u0936 \u0906\u092f\u0941 18 \u0938\u0947 40 \u0935\u0930\u094d\u0937 \u0939\u0948\u0964"
+  },
+  {
+    "question": "Compare PM-KISAN and PM-SYM for a 40-year-old landless farm labourer.",
+    "reference": "PM-KISAN provides income support to landholding farmer families (Rs 6,000 per year via DBT), so a landless labourer does not qualify for it; PM-SYM covers unorganised workers aged 18-40 with income up to Rs 15,000 and pays Rs 3,000 per month from age 60, so a 40-year-old landless farm labourer fits PM-SYM."
+  },
+  {
+    "question": "A 55-year-old wants a scheme; should they consider PM-KISAN or PM-SYM?",
+    "reference": "PM-SYM has an entry age of 18 to 40 years, so a 55-year-old cannot newly join PM-SYM; PM-KISAN is for landholding farmer families and has no stated upper age limit, so a landholding farmer of 55 could consider PM-KISAN."
+  },
+  {
+    "question": "What does the scheme document say verbatim about PMAY-G assistance amounts?",
+    "reference": "PMAY-G provides financial assistance of Rs 1.20 lakh per house in plain areas and Rs 1.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts."
+  },
+  {
+    "question": "Which scheme directory entry covers Sikkim and what does it link to?",
+    "reference": "The Sikkim entry is a directory_seed discovery record (data_status: directory_seed) that confirms scheme-search coverage for the jurisdiction and links citizens to the official national MyScheme discovery portal (https://www.myscheme.gov.in/); it makes no scheme-level eligibility claims."
   }
 ]
