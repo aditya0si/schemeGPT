@@ -153,6 +153,41 @@ profile-aware case passing), and `pytest` passes as part of the smoke check.
 
 ## Slice 5 — Retire Streamlit
 
+## Addendum (2026-08-19): AI-engineering hardening track
+
+User-approved track of seven improvements, implemented in order after Slice 1
+(scheme browser slices may interleave later). Honesty semantics and the
+`/query` response shape remain stable; `/query/stream` may gain additive
+events (`quotes`, `step`).
+
+1. **Multilingual embeddings** — swap `all-MiniLM-L6-v2` for
+   `intfloat/multilingual-e5-small` (same 384-dim, E5 query/passage prefixes)
+   with `scripts/reembed.py` migration + startup mismatch warning. Fixes weak
+   Devanagari retrieval for the actual audience.
+2. **Structured quotes with verification** — server-side parsing of the
+   `> quote [source, data_status]` lines, programmatic verification against
+   retrieved context (normalized containment or ≥0.85 similarity), emitted as
+   a `quotes` SSE event; unverified quotes are flagged, never silently kept.
+3. **Hybrid retrieval + reranking** — Postgres `tsvector` FTS fused with
+   vector search via reciprocal rank fusion (k=60); optional CPU cross-encoder
+   reranker (`BAAI/bge-reranker-base`) behind `ENABLE_RERANKER` (RAM-bound
+   VPSes keep it off).
+4. **Evaluation as a regression gate** — expanded golden set (Hinglish,
+   Hindi, comparative, quote-format, out-of-domain), RAGAS
+   context-precision/recall added, per-run history (`history.jsonl`), and a
+   `--gate` mode failing below floors (faithfulness ≥ 0.85, relevancy ≥ 0.70).
+5. **Agentic multi-step retrieval** — heuristic router sends comparative /
+   multi-scheme / profile-aware questions to a Groq tool-calling loop
+   (tools: `search_schemes`, `get_scheme_details`, `list_jurisdictions`; max 3
+   tool iterations) that gathers context across steps, then streams the final
+   answer like the single-shot path; `step` events expose each tool call.
+6. **Observability** — `app/metrics.py` in-process counters + latency
+   percentiles exposed at `GET /metrics`; LangSmith tracing documented as
+   env-only opt-in.
+7. **Model routing** — `GROQ_FAST_MODEL` (default `llama-3.1-8b-instant`)
+   for normalization/small tasks; `GROQ_MODEL` (70b) reserved for answers and
+   the agent loop.
+
 Remove the Streamlit compose service and `Dockerfile.streamlit`; keep
 `streamlit_app.py` in repo history for reference. Update README (architecture,
 quickstart, VPS runbook ports — new UI port replaces 8501) and the smoke check.
