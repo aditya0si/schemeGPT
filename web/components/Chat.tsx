@@ -4,11 +4,20 @@ import { useRef, useState } from "react";
 import { useLanguage } from "./LanguageProvider";
 import { SourceCard, type Source } from "./SourceCard";
 
+type Quote = {
+  text: string;
+  source: string;
+  status?: string | null;
+  verified: boolean;
+  matched_source?: string | null;
+};
+
 type Msg = {
   role: "user" | "assistant";
   text: string;
   streaming?: boolean;
   sources?: Source[];
+  quotes?: Quote[];
   mode?: "live" | "demo";
   notice?: string | null;
   error?: string;
@@ -92,6 +101,8 @@ export function Chat() {
               mode: (data as { mode: "live" | "demo" }).mode,
               notice: (data as { notice: string | null }).notice,
             }));
+          else if (event === "quotes")
+            patch((a) => ({ ...a, quotes: data as Quote[] }));
           else if (event === "error")
             patch((a) => ({
               ...a,
@@ -171,6 +182,34 @@ export function Chat() {
                   <ul>
                     {m.sources.map((s, j) => (
                       <SourceCard key={j} source={s} />
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {m.quotes && m.quotes.length > 0 && !m.streaming ? (
+                <div className="mt-2 border border-ink/25 px-4 py-3">
+                  <p className="font-mono text-[11px] uppercase">
+                    Verified quotes[{m.quotes.length}]
+                  </p>
+                  <ul className="mt-2 space-y-3">
+                    {m.quotes.map((q, j) => (
+                      <li key={j} className="border-l-2 border-ink/25 pl-3">
+                        {q.verified ? (
+                          <span className="font-mono text-[11px] uppercase text-verified">
+                            ✓ verified
+                          </span>
+                        ) : (
+                          <span className="font-mono text-[11px] uppercase text-signal">
+                            ✗ unverified
+                          </span>
+                        )}{" "}
+                        <span className="font-mono text-[11px] text-ink/60">
+                          {q.matched_source ?? q.source}
+                        </span>
+                        <blockquote className="mt-1 font-sans text-base italic text-ink">
+                          “{q.text}”
+                        </blockquote>
+                      </li>
                     ))}
                   </ul>
                 </div>

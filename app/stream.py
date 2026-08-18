@@ -28,6 +28,7 @@ from app.rag import (
     get_retriever,
     normalize_question,
 )
+from app.quotes import parse_quotes, verify_quotes
 from app.schemas import ProfileData
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ async def stream_answer(
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
     tokens_sent = False
+    answer_parts: list[str] = []
     try:
         # Fail fast (no key -> ValueError) before touching the DB.
         get_llm()
@@ -88,7 +90,11 @@ async def stream_answer(
             if not text:
                 continue
             tokens_sent = True
+            answer_parts.append(text)
             yield _sse("token", {"text": text})
+        verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
+        if verified:
+            yield _sse("quotes", [q.__dict__ for q in verified])
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:
         if tokens_sent:
@@ -114,6 +120,9 @@ async def stream_answer(
         yield _sse("sources", demo["sources"])
         for word in demo["answer"].split(" "):
             yield _sse("token", {"text": word + " "})
+        demo_verified = verify_quotes(parse_quotes(demo["answer"]), demo["sources"])
+        if demo_verified:
+            yield _sse("quotes", [q.__dict__ for q in demo_verified])
         yield _sse(
             "done",
             {"mode": "demo", "notice": demo["notice"], "language": lang},

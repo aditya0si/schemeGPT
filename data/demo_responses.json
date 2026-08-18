@@ -8,7 +8,7 @@
         "income support", "6000", "6,000", "instalment", "installment",
         "2000", "direct benefit transfer", "dbt", "farmer"
       ],
-      "answer": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi) is a central sector scheme that provides income support of Rs 6,000 per year to eligible landholding farmer families in India. The amount is paid directly into the beneficiary's bank account through Direct Benefit Transfer (DBT) in three equal instalments of Rs 2,000 each, released every four months.",
+      "answer": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi) is a central sector scheme that provides income support of Rs 6,000 per year to eligible landholding farmer families in India. The amount is paid directly into the beneficiary's bank account through Direct Benefit Transfer (DBT) in three equal instalments of Rs 2,000 each, released every four months.\n\n> eligible farmers receive Rs 6,000 per year, paid directly into their bank accounts through Direct Benefit Transfer (DBT). [schemes/pm-kisan.md, sample_verified]",
       "answer_hi": "पीएम-किसान (प्रधानमंत्री किसान सम्मान निधि) एक केंद्रीय क्षेत्र की योजना है जो भारत में पात्र भूमिधारी किसान परिवारों को प्रति वर्ष ₹6,000 की आय सहायता प्रदान करती है। यह राशि डायरेक्ट बेनिफिट ट्रांसफर (डीबीटी) के माध्यम से सीधे लाभार्थी के बैंक खाते में ₹2,000 की तीन समान किश्तों में दी जाती है, और हर चार महीने में एक किश्त जारी की जाती है।",
       "sources": [
         {

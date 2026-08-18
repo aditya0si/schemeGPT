@@ -94,3 +94,22 @@ async def test_stream_hindi_demo(client):
 async def test_stream_rejects_short_question(client):
     resp = await client.post("/query/stream", json={"question": "x"})
     assert resp.status_code == 422
+
+
+async def test_stream_demo_emits_quotes_before_done(client):
+    resp = await client.post(
+        "/query/stream",
+        json={"question": "How much income support does PM-KISAN provide?"},
+    )
+    assert resp.status_code == 200
+    events = parse_sse(resp.text)
+    names = [e for e, _ in events]
+    assert "quotes" in names
+    assert names[-1] == "done"  # the quotes event must precede done
+    quotes = next(d for e, d in events if e == "quotes")
+    assert quotes, "expected at least one quote"
+    q = quotes[0]
+    assert set(q) >= {"text", "source", "status", "verified", "matched_source"}
+    # The demo answer quotes a real sentence from pm-kisan.md, so it verifies.
+    assert q["verified"] is True
+    assert q["matched_source"] == "pm-kisan.md"
