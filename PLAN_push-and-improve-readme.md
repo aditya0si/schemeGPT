@@ -54,8 +54,8 @@
   - [x] Draft comprehensive architecture & feature sections in `README.md`
   - [x] Add relevant AI Engineering, RAG, & Indian Government Schemes keywords
   - [x] Verify relative links and markdown rendering
-- [ ] Session 2: Security Audit, Git Remote Setup & Repository Push
-  - [ ] Audit `.gitignore` and ensure no `.env` or sensitive files are staged
-  - [ ] Configure git remote `origin` to `https://github.com/aditya0si/schemeGPT.git`
-  - [ ] Commit README updates with clear commit message
-  - [ ] Push local `main` branch to remote repository cleanly
+- [x] Session 2: Security Audit, Git Remote Setup & Repository Push
+  - [x] Audit `.gitignore` and ensure no `.env` or sensitive files are staged
+  - [x] Configure git remote `origin` to `https://github.com/aditya0si/schemeGPT.git`
+  - [x] Commit README updates with clear commit message
+  - [x] Push local `main` branch to remote repository cleanly
