@@ -32,6 +32,13 @@ from app.db import COLLECTION_NAME, get_engine  # noqa: E402
 
 def _delete_collection_vectors() -> int:
     with get_engine().begin() as conn:
+        # Fresh databases have no vector tables until the first
+        # get_vectorstore() call creates them; there is nothing to delete.
+        table_exists = conn.execute(
+            text("SELECT to_regclass('public.langchain_pg_embedding')")
+        ).scalar()
+        if table_exists is None:
+            return 0
         result = conn.execute(
             text(
                 "DELETE FROM langchain_pg_embedding "

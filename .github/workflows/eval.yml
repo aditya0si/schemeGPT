@@ -1,0 +1,61 @@
+name: RAGAS eval gate
+
+# Offline RAG evaluation with regression gate over the real stack: a
+# pgvector service container + local e5 embeddings + Groq as the answer and
+# judge LLM. Requires the GROQ_API_KEY repository secret; the job is skipped
+# (not failed) when the secret is absent.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+jobs:
+  eval:
+    name: RAGAS faithfulness gate
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GROQ_API_KEY != '' }}
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: scheme
+          POSTGRES_PASSWORD: scheme
+          POSTGRES_DB: schemegpt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scheme"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://scheme:scheme@localhost:5432/schemegpt
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      HF_HOME: /tmp/hf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CPU-only PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0
+      - name: Install dependencies (incl. RAGAS)
+        run: pip install -r requirements-eval.txt
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: /tmp/hf
+          key: e5-small-${{ runner.os }}
+      - name: Re-embed corpus into pgvector
+        run: python scripts/reembed.py --yes
+      - name: Run evaluation with regression gate
+        run: python -m eval.run_eval --gate
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: |
+            eval/results/report.md
+            eval/results/scores.json

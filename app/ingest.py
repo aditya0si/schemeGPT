@@ -44,18 +44,21 @@ def _plan_directories(configured: Path) -> list[Path]:
     """Markdown source directories to scan (deduplicated, in order).
 
     - If the configured directory is the data root itself (``data``), scan that
-      root recursively so ``schemes/`` and ``states/`` are both covered.
-    - Otherwise load the configured directory plus ``data/states`` when it
-      exists, so the nationwide directory is ingested without manual ``.env``
-      edits.
+      root recursively so ``schemes/``, ``states/`` and ``myscheme/`` are all
+      covered.
+    - Otherwise load the configured directory plus the ``data/states`` and
+      ``data/myscheme`` directories when they exist, so the nationwide
+      directory and the myScheme import corpus are ingested without manual
+      ``.env`` edits.
     """
     root = configured.resolve()
     data_root = _data_root()
     directories: list[Path] = [root]
     if root != data_root:
-        states_dir = data_root / "states"
-        if states_dir.is_dir() and states_dir.resolve() != root:
-            directories.append(states_dir)
+        for extra in ("states", "myscheme"):
+            extra_dir = data_root / extra
+            if extra_dir.is_dir() and extra_dir.resolve() != root:
+                directories.append(extra_dir)
 
     seen: set[str] = set()
     ordered: list[Path] = []
@@ -160,6 +163,11 @@ def _chunk_metadata(rel_source: str) -> dict:
         meta["data_status"] = "directory_seed"
     elif rel_source.startswith("schemes/"):
         meta["jurisdiction"] = "central"
+    elif rel_source.startswith("myscheme/"):
+        # Automated imports from the myScheme portal: honest provenance so
+        # the answer layer can distinguish them from verified records.
+        meta["jurisdiction"] = "myscheme_import"
+        meta["data_status"] = "myscheme_import"
     return meta
 
 

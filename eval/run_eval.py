@@ -368,8 +368,8 @@ def _write_report(
         "failure case."
     )
     lines.append(
-        "- Judge LLM: Groq (`llama-3.3-70b-versatile`, free tier); "
-        "embeddings: local `all-MiniLM-L6-v2`."
+        "- Judge LLM: Groq (settings.groq_model, free tier); "
+        "embeddings: local sentence-transformers."
     )
     lines.append("")
     lines.append("## Aggregate Scores")
@@ -489,8 +489,13 @@ def _write_scores(
 
 def _config_fingerprint() -> dict:
     """Which model/retriever configuration produced this run's scores."""
-    from app.config import settings
+    from app.config import ROOT_DIR, settings
     from app.rag import PROMPT_VERSION
+
+    corpus = {}
+    for name in ("schemes", "states", "myscheme"):
+        directory = ROOT_DIR / "data" / name
+        corpus[name] = len(list(directory.glob("*.md"))) if directory.is_dir() else 0
 
     return {
         "prompt_version": PROMPT_VERSION,
@@ -499,11 +504,12 @@ def _config_fingerprint() -> dict:
         "groq_fast_model": settings.groq_fast_model,
         "reranker_enabled": settings.enable_reranker,
         "retriever": "hybrid",
+        "corpus": corpus,
     }
 
 
 def _append_history(
-    aggregate: dict, generated_at: str, limit: int | None
+    aggregate: dict, generated_at: str, limit: int | None, label: str | None = None
 ) -> None:
     """Append one JSON line per run; used for delta comparisons."""
     try:
@@ -512,6 +518,7 @@ def _append_history(
                 json.dumps(
                     {
                         "generated_at": generated_at,
+                        "label": label,
                         "limit": limit,
                         "config": _config_fingerprint(),
                         "aggregate": aggregate,
@@ -537,7 +544,7 @@ def _previous_aggregate() -> dict | None:
         return None
 
 
-def run(limit: int | None = None, gate: bool = False) -> dict[str, Any]:
+def run(limit: int | None = None, gate: bool = False, label: str | None = None) -> dict[str, Any]:
     _ensure_project_on_path()
 
     from app.config import settings
@@ -580,7 +587,7 @@ def run(limit: int | None = None, gate: bool = False) -> dict[str, Any]:
         limit=limit,
     )
     _write_scores(cases, aggregate, generated_at, len(questions), limit)
-    _append_history(aggregate, generated_at, limit)
+    _append_history(aggregate, generated_at, limit, label)
 
     gate_failures = check_gate(aggregate) if gate else []
 
@@ -615,12 +622,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Fail (exit 1) if the aggregate gate floors are missed "
         "(faithfulness >= 0.85, answer_relevancy >= 0.70).",
     )
+    parser.add_argument(
+        "--label",
+        type=str,
+        default=None,
+        metavar="TEXT",
+        help="Tag this run in eval/results/history.jsonl and the report "
+        "(e.g. 'baseline-42docs', 'scaled-723docs').",
+    )
     args = parser.parse_args(argv)
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be a positive integer")
 
     try:
-        summary = run(limit=args.limit, gate=args.gate)
+        summary = run(limit=args.limit, gate=args.gate, label=args.label)
     except EvalError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

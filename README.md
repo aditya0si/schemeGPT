@@ -4,7 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
 [![pgvector](https://img.shields.io/badge/pgvector-PostgreSQL%2016-336791.svg)](https://github.com/pgvector/pgvector)
-[![Groq Llama-3.3](https://img.shields.io/badge/LLM-Groq%20Llama--3.3--70b-orange.svg)](https://groq.com/)
+[![Groq gpt-oss](https://img.shields.io/badge/LLM-Groq%20gpt-oss--120b-orange.svg)](https://groq.com/)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![RAGAS Evaluation](https://img.shields.io/badge/Eval-RAGAS%200.2.15-green.svg)](https://github.com/explodinggradients/ragas)
 [![CI](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml)
@@ -21,7 +21,7 @@
 
 ## 📌 Keywords & Technical Domain Tags
 
-`RAG` · `Retrieval-Augmented Generation` · `AI Engineering` · `pgvector` · `Reciprocal Rank Fusion (RRF)` · `FastAPI` · `Next.js 15` · `Streamlit` · `Groq Llama-3.3` · `LangChain` · `Sentence-Transformers` · `Indian Government Schemes` · `MyScheme India` · `Public Welfare AI` · `SSE Streaming` · `Quote Verification` · `RAGAS Offline Evaluation` · `Multi-Step Tool-Calling Agent` · `Bilingual NLP (English + Hindi)` · `Docker Compose`
+`RAG` · `Retrieval-Augmented Generation` · `AI Engineering` · `pgvector` · `Reciprocal Rank Fusion (RRF)` · `FastAPI` · `Next.js 15` · `Streamlit` · `Groq gpt-oss` · `LangChain` · `Sentence-Transformers` · `Indian Government Schemes` · `MyScheme India` · `Public Welfare AI` · `SSE Streaming` · `Quote Verification` · `RAGAS Offline Evaluation` · `Multi-Step Tool-Calling Agent` · `Bilingual NLP (English + Hindi)` · `Docker Compose`
 
 ---
 
@@ -132,7 +132,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
       "verification_status": "PASSED"
     }
   ],
-  "model": "llama-3.3-70b-versatile",
+  "model": "openai/gpt-oss-120b",
   "latency_ms": 742
 }
 ```
@@ -158,7 +158,7 @@ flowchart TD
     end
 
     subgraph Engine["LLM & Embeddings"]
-        Groq["ChatGroq (llama-3.3-70b / llama-3.1-8b)"]
+        Groq["ChatGroq (gpt-oss-120b / gpt-oss-20b)"]
         ST["Sentence-Transformers (384-dim)"]
     end
 
@@ -189,7 +189,7 @@ flowchart TD
 
 - **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+), Uvicorn, Pydantic v2
 - **Vector Store & Database**: [PostgreSQL 16](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) extension
-- **LLM Engine**: [Groq API](https://console.groq.com/) using `llama-3.3-70b-versatile` (synthesis) and `llama-3.1-8b-instant` (routing)
+- **LLM Engine**: [Groq API](https://console.groq.com/) using `openai/gpt-oss-120b` (synthesis) and `openai/gpt-oss-20b` (routing)
 - **Embedding Model**: `intfloat/multilingual-e5-small` (384 dimensions, local PyTorch CPU execution)
 - **Frontend Applications**:
   - **Next.js 15**: TypeScript, Tailwind CSS, React 19 (`web/`)

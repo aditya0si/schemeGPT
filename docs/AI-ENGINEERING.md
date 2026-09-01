@@ -32,8 +32,8 @@ There are exactly **two** model families, both free:
 | --- | --- | --- |
 | `intfloat/multilingual-e5-small` (384-dim) | embeddings — English+Hindi+Hinglish | local, on first embed |
 | `BAAI/bge-reranker-base` (optional) | cross-encoder rerank of the fused shortlist | on demand, `ENABLE_RERANKER=1` (~2 GB CPU) |
-| Groq `llama-3.3-70b-versatile` | final answers, agentic reasoning | cloud, per query |
-| Groq `llama-3.1-8b-instant` | cheap sub-tasks (question normalization) | cloud, per normalization |
+| Groq `openai/gpt-oss-120b` | final answers, agentic reasoning | cloud, per query |
+| Groq `openai/gpt-oss-20b` | cheap sub-tasks (question normalization) | cloud, per normalization |
 
 No paid embedding API is used anywhere — embeddings and retrieval are fully
 local; the only external API is Groq's free tier.
@@ -169,7 +169,7 @@ LangChain).
 
 ### 5.7 Model routing
 `app.rag.get_llm(role, max_tokens)` returns the cheap fast model
-(`GROQ_FAST_MODEL`, default `llama-3.1-8b-instant`) for question normalization
+(`GROQ_FAST_MODEL`, default `openai/gpt-oss-20b`) for question normalization
 and the stronger answer model (`GROQ_MODEL`) for final answers and the agentic
 loop. Every generation stays token-bounded.
 
@@ -182,8 +182,8 @@ Environment variables (`.env.example` documents all of them):
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GROQ_API_KEY` | (blank → demo) | live answers; also needed for RAGAS eval |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | answer + agent model |
-| `GROQ_FAST_MODEL` | `llama-3.1-8b-instant` | normalization / cheap tasks |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | answer + agent model |
+| `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | normalization / cheap tasks |
 | `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | local embeddings (E5-prefixed) |
 | `ENABLE_RERANKER` | `0` | `1` loads `bge-reranker-base` (~2 GB) |
 | `DATABASE_URL` | `…@db:5432/schemegpt` | pgvector connection |
