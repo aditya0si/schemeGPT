@@ -59,7 +59,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 ## Quick Numbers
 
-- **~3,200 scheme docs**: Ingested and structured across central welfare ministries and all 36 Indian States and Union Territories.
+- **~2,100 scheme records**: 6 hand-verified central schemes, 36 state/UT directory seeds, and 2,052 automated myScheme-portal imports (each labeled with its data_status — the system never blurs verified and imported records).
 - **RRF hybrid retrieval**: Reciprocal Rank Fusion fusing dense `multilingual-e5-small` embeddings with PostgreSQL `tsvector` keyword search.
 - **RAGAS 4-metric gate**: Automated CI regression tests enforcing faithfulness, answer relevancy, context precision, and context recall floors.
 - **FastAPI + Next.js 15**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 15 frontend and Streamlit demo.
@@ -153,11 +153,19 @@ p99 51 ms** (`loadtest/RESULTS.md`).
 
 | Run | Corpus | faithfulness | answer_relevancy | context_precision | context_recall |
 | --- | --- | --- | --- | --- | --- |
-| baseline-42docs | 42 docs / 90 chunks | _(below)_ | _(below)_ | _(below)_ | _(below)_ |
-| scaled-myscheme | + myScheme imports | _(below)_ | _(below)_ | _(below)_ | _(below)_ |
+| baseline-42docs (2026-09-02) | 42 docs / 90 chunks | 0.667 | 0.842 | 0.698 | 0.600 |
+| scaled-myscheme | + 2,052 myScheme imports | pending quota window | pending | pending | pending |
 
-<!-- Numbers are filled from eval/results/report.md after each labeled run:
-     python -m eval.run_eval --gate --label <label> -->
+> **Read these numbers honestly.** They are the first labeled run after two
+> forced changes: Groq decommissioned the Llama-3.x models mid-project (the
+> pipeline now runs `gpt-oss-120b`/`gpt-oss-20b`), and the eval set grew from
+> 12 to 20 harder cases (Hinglish, Hindi, comparative, multi-hop) while the
+> judge model also changed. Two of twenty cases were additionally skewed by a
+> since-fixed semantic-cache interaction (a cached test payload served one
+> eval case) and three judge calls hit free-tier rate limits. The free tier
+> also imposes a 200k tokens/day per-model budget, so full-set runs must be
+> spaced out. Regenerate any time:
+> `python -m eval.run_eval --gate --label <label>`.
 
 **Cost engineering:** per-model token usage is tracked on `/metrics`
 (reference list-price mapping in `app/rag.py`), the semantic cache serves

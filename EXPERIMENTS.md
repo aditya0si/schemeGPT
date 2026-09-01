@@ -12,29 +12,39 @@ changed, what it cost, and what it bought. Numbers are RAGAS aggregates over
 
 ## Run history
 
-### baseline-42docs — 2026-09-01
+### baseline-42docs — 2026-09-02 (first completed labeled run)
 
 - **Corpus:** 42 documents (6 verified central schemes + 36 state/UT
   directory seeds) → 90 chunks.
-- **Config:** e5-small embeddings, hybrid retrieval (RRF), gpt-oss-120b
-  answer / gpt-oss-20b normalize, no reranker, prompt 2026-08-19-quotes.
-- **Result:** see the table in the README (regenerated from
-  `eval/results/report.md`).
-- **Notes:** first run after the LLM provider swap (Groq decommissioned the
-  Llama-3.x models mid-project; gpt-oss-120b/20b are the replacements). Also
-  the first run of the 4-metric harness with a rate-limit-aware judge
-  config (RunConfig max_workers=2 — the default parallel executor trips
-  Groq's shared token/minute limits and times out).
+- **Config:** e5-small embeddings, hybrid retrieval (RRF), answer model
+  gpt-oss-20b, judge gpt-oss-20b (this run predates the EVAL_JUDGE_MODEL
+  split), no reranker, prompt 2026-08-19-quotes.
+- **Result:** faithfulness **0.667**, answer_relevancy **0.842**,
+  context_precision **0.698**, context_recall **0.600** (20 cases).
+- **Honest caveats:** (1) one case's retrieval was emptied by a since-fixed
+  semantic-cache bug (an eval answer got cached, then a paraphrased eval case
+  was served from it — evals now disable the cache in `run()`); (2) three
+  judge calls hit free-tier rate limits and score None for those cases;
+  (3) the gate floors (faithfulness >= 0.85) were calibrated on the
+  llama-3.3-70b era and were NOT met by this baseline — the floors stay as
+  the target and the miss is published, not papered over.
+- **Learnings for the next run:** gpt-oss models emit reasoning tokens that
+  count against both the 8k tokens/minute and 200k tokens/day per-model
+  budgets; agent-routed cases burst hardest. The harness now spaces cases by
+  40 s and backs off 65 s on a rate-limited case.
 
-### scaled-myscheme — 2026-09-01
+### scaled-myscheme — pending
 
-- **Corpus:** 42 + N myScheme-import records (see `/coverage`) → re-embed via
-  `scripts/reembed.py --yes`, then
-  `python -m eval.run_eval --gate --label scaled-myscheme`.
+- **Corpus:** 42 + 2,052 myScheme imports (re-embed via
+  `scripts/reembed.py --yes`).
 - **What this experiment answers:** does hybrid retrieval + RRF hold up when
   the corpus grows ~50x and most records are automated imports rather than
   hand-verified? Context precision is the metric to watch: with 42 documents
-  almost anything relevant is in the top-4; at scale it has to earn its place.
+  almost anything relevant is in the top-4; at scale it has to earn its
+  place.
+- **Status:** the scaled corpus is ingested; the eval run is blocked only by
+  the free-tier daily token budget and regenerates with
+  `python -m eval.run_eval --gate --label scaled-myscheme`.
 
 ## Framework
 
