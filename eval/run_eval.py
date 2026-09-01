@@ -577,6 +577,10 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
 
     from app.config import settings
 
+    # The eval must measure the live pipeline, never the semantic cache:
+    # cached answers carry stale/foreign sources and would poison scoring.
+    settings.enable_semantic_cache = False
+
     if not settings.groq_api_key.strip():
         raise EvalError(
             "GROQ_API_KEY is missing or empty. Set GROQ_API_KEY in your "
