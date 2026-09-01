@@ -1,0 +1,104 @@
+# Technical Education Scholarship Scheme For Diploma Level
+
+**State/UT:** Himachal Pradesh
+
+## Source
+
+- **Official source:** https://www.myscheme.gov.in/schemes/tessdlhp
+- **Origin:** myScheme national portal (dataset capture, Apache-2.0); verify on the official portal before applying.
+- **Data status:** myscheme_import
+
+## Jurisdiction
+
+- **Jurisdiction:** Himachal Pradesh (as listed on myScheme)
+This is an automated import, not a hand-verified record.
+
+## Details
+
+The scheme “Technical Education Scholarship Scheme For
+Diploma Level” was started by the Department of Technical Education, Himachal Pradesh. Under the scheme, the scholarships will be
+awarded to students who are pursuing Diploma level Courses in Engineering/Technology including Architectural Assistantship or any
+other equivalent courses as approved by the All India Council of Technical Education (AICTE).Number of Scholarship:Total number of
+scholarships for Diploma Courses will be 75 Number.
+
+## Benefits
+
+The value of scholarship for Diploma level courses is ₹200/- per month
+for all categories of students.Note: For Diploma students 100% scholarships shall be awarded to the SC, ST, and Girls
+students.
+
+## Eligibility
+
+Only those students shall be eligible for the award of scholarships who are Bonafide Himachali and ward of Himachal
+Pradesh Government employees.The scholarships will be awarded to the students who are pursuing Diploma level Courses in
+Engineering/Technology including Architectural Assistantship or any other equivalent courses as approved by the All India Council of
+Technical Education (AICTE).The scholarship shall be awarded only if the total income of parents or guardians from all the sources is
+not more than ₹36000/- per annum.Note 01: The scholarship shall be awarded on the basis of (i) Poverty-cum-Brilliance and (ii)
+Brilliance.Note 02: The scholarship shall be awarded strictly according to merit to be determined with reference to (i) Income of parents
+or guardian and (ii) Marks obtained in the Examination/Class by virtue of which a candidate is eligible for admission provided the
+students has Secured at least 60% of marks in the said exam. This condition will however not be applicable to the SC and ST Students as
+their merit will be judged amongst themselves.Note 03: The students who become eligible for scholarships on the basis of poverty-cum-
+brilliance shall first be awarded scholarships. After their list is exhausted, the remaining scholarships shall be awarded on the basis of
+brilliance.Note 04: The scholarship shall be tenable for the full course from the date of joining for the duration of the course and shall be
+awarded/renewed on a year-to-year basis subject to satisfactory progress of the student and continued good conduct.Note 05: The
+recommendation of the Principal or other authorized officer of the institute where the student is studying will be necessary for the
+award/renewal of the scholarship. If the student fails in a university examination in the Polytechnic examination or any examinations or
+tests while undergoing the course which prevents him/her from being promoted to the next higher class, the scholarship shall be
+discontinued. However, two failures will not result in an extension in the total period of the course.Note 06: The students who are not
+awarded scholarships from the date of joining of courses i.e. in the first year can also be considered for award of scholarships in
+subsequent years in case numbers of scholarships are available due to dropouts, failure or otherwise, in particular year shall not be
+exceeded. These scholarships shall be awarded on the basis of the performance of the previous annual examination they have passed in
+the Engineering course. Other conditions of award of fresh/renewal of scholarship, will remain operative as at present in
+vogue.ExclusionsStudents getting scholarships from other sources or under some other scheme shall not be eligible for a grant of the
+same under these rules.
+
+## Application Process
+
+OnlineStep 01: The students applying for the scholarship for the first time need to "Register"
+using the icon “New Registration” at the NSP Portal URL - https://scholarships.gov.in/, by providing accurate and correct
+information as per their documents.Step 02: After successfully get registration done, students will get their “Student Registration
+ID”.Step 03: Through “Student Registration ID” students will be able to login into the account using the icon “Fresh
+Application” at NSP Portal.Step 04: After successful login to the portal, the welcome page appeared. On clicking the “Application
+Form” icon, students will be directed to the application screen.Step 05: Now, the students may fill out the complete application form
+and on clicking the “Final Submit” button, the application is finally submitted.Step 06: On successful submission of the application,
+a system-generated registration number is sent to the students which can be used for future reference.
+
+## Documents Required
+
+1. Aadhaar
+Card (UID / EID No)2. Passport Size Photo3. Himachali Bonafide Certificate4. Previous Year(s) Result Card(s) from Matric onwards.5.
+Income Certificate of Parent/Guardian (Issued by an officer, not below the rank of Tehsildar)6. Latest Bank Statement of the Students
+Bank Account7. Caste Certificate (Issued by an officer, not below the rank of Tehsildar)8. Any other document, as requiredNote 01: For
+all girl students Income Certificate is not mandatory.Note 02: The students applying for poverty-cum- brilliance scholarship should
+furnish a certificate of the annual income of parents/guardians in the prescribed form duly attested by a Magistrate or Tehsildar. Students
+applying for the Brilliance Scholarship need to submit an income certificate.
+
+## FAQs
+
+What is the “Technical
+Education Scholarship Scheme For Diploma Level” scheme?Under the scheme, the scholarships will be awarded to students who are
+pursuing Diploma level Courses in Engineering/Technology including Architectural Assistantship or any other equivalent courses as
+approved by the All India Council of Technical Education (AICTE).Which is the implementing department of this scheme?Department
+of Technical Education, Vocational and Industrial Training, Himachal PradeshWho is eligible to apply under the scheme?The
+scholarships will be awarded to the students who are pursuing Diploma level Courses in Engineering/Technology including Architectural
+Assistantship or any other equivalent courses as approved by the All India Council of Technical Education (AICTE).Is this scholarship
+scheme only for the students of Himachal Pradesh?Yes, Only those students shall be eligible for the award of scholarships who are
+Bonafide Himachali and ward of Himachal Pradesh Government employees.What is the income criterion for applying under the scheme?
+The scholarship shall be awarded only if the total income of parents or guardians from all the sources is not more than ₹36000/- per
+annum.What is the benefit of the scheme?The value of scholarship for Diploma level courses is ₹200/- per month for all categories of
+students.How many students will receive the scholarship under the scheme?The scholarship will be given to a total number of 75
+Number of students.On what basis will scholarship be awarded to students?The scholarship is awarded on the basis of (i) Poverty-cum-
+Brilliance and (ii) Brilliance.Can a student avail of the benefits of the scholarship from second year of his/her course if not awarded
+scholarship in the first year?Yes, the students who are not awarded scholarships from the date of joining of courses i.e. in the first year
+can also be considered for award of scholarships in subsequent years in case numbers of scholarships are available due to dropouts,
+failure or otherwise, in particular year shall not be exceeded.How to apply for this scholarship?Online submission of the application form
+can be done through the website of the National Scholarship Portal. https://scholarships.gov.in/
+
+## Sources And References
+
+Official
+WebsiteGuidelinesEPASS PortalNational Scholarship PortalOkWas this helpful?
+
+## Disclaimer
+
+This record is an automated import from the myScheme portal and may be incomplete or outdated. It is not official advice; always verify eligibility and process on the official portal before applying.

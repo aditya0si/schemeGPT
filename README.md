@@ -139,6 +139,34 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 ---
 
+## Measured Results
+
+Reproduced with the commands in `eval/` and `loadtest/`; raw run history in
+`eval/results/history.jsonl`, narration in [`EXPERIMENTS.md`](EXPERIMENTS.md).
+
+**Serving layer** (Locust, 25 concurrent users, 60 s, demo-mode SSE — full
+`sources → token* → done` event sequences required for success): **860/860
+streams succeeded, 0 failures, 14.5 streams/s, median 11 ms, p95 25 ms,
+p99 51 ms** (`loadtest/RESULTS.md`).
+
+**Answer quality (RAGAS, 20 curated cases, Groq free-tier judge):**
+
+| Run | Corpus | faithfulness | answer_relevancy | context_precision | context_recall |
+| --- | --- | --- | --- | --- | --- |
+| baseline-42docs | 42 docs / 90 chunks | _(below)_ | _(below)_ | _(below)_ | _(below)_ |
+| scaled-myscheme | + myScheme imports | _(below)_ | _(below)_ | _(below)_ | _(below)_ |
+
+<!-- Numbers are filled from eval/results/report.md after each labeled run:
+     python -m eval.run_eval --gate --label <label> -->
+
+**Cost engineering:** per-model token usage is tracked on `/metrics`
+(reference list-price mapping in `app/rag.py`), the semantic cache serves
+paraphrased repeats without an LLM call (hit rate on `/metrics`), and the
+per-IP token bucket (`RATE_LIMIT_RPM`, default 20/min) keeps a public
+deployment inside the shared free-tier quota.
+
+---
+
 ## System Architecture & RAG Pipeline
 
 ```mermaid
@@ -225,11 +253,19 @@ SchemeGPT/
 ├── eval/                     # RAGAS Evaluation Suite
 │   ├── run_eval.py           # Evaluation runner with quality thresholds & reporting
 │   └── questions.json        # Curated test evaluation dataset (English + Hindi)
+├── loadtest/                 # Locust load test for the SSE endpoint (+ RESULTS.md)
 ├── docs/                     # Documentation & Specifications
 │   ├── AI-ENGINEERING.md     # In-depth architectural & RAG design guide
+│   ├── DEPLOY.md             # Hosted deployment runbook (Vercel + Fly.io + Neon)
 │   └── data-operations.md    # Scheme catalog curation & verification workflow
 ├── scripts/                  # Helper scripts
-│   └── validate_data.py      # Dependency-free schema & directory validator
+│   ├── validate_data.py      # Dependency-free schema & directory validator
+│   ├── fetch_myscheme.py     # Corpus expansion: myScheme portal dataset -> Markdown
+│   ├── reembed.py            # Rebuild vectors after an embedding-model change
+│   └── feedback_to_eval.py   # Curated user feedback -> candidate eval cases
+├── .github/workflows/        # CI (tests, data validation, web build) + weekly eval gate
+├── fly.toml                  # Fly.io deployment config for the API
+├── EXPERIMENTS.md            # Run-by-run experiment log with config fingerprints
 ├── Dockerfile                # API container multi-stage build
 ├── docker-compose.yml        # Multi-container orchestration (DB, API, Web, Streamlit)
 ├── requirements.txt          # Production Python dependencies
@@ -253,7 +289,8 @@ SchemeGPT/
 | `PUT /profiles/{id}` | `PUT` | Update saved citizen profile. | Header: `X-Profile-Token` |
 | `DELETE /profiles/{id}`| `DELETE` | Delete saved citizen profile. | Header: `X-Profile-Token` |
 | `POST /ingest` | `POST` | Trigger re-ingestion of `data/schemes` & `data/states` vectors. | Header: `X-Admin-Token` |
-| `GET /metrics` | `GET` | Observability metrics (requests, latency, LLM call counts). | None |
+| `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage. | None |
+| `POST /feedback` | `POST` | Thumbs-up/down rating on one answer; curated ratings grow the eval set (`scripts/feedback_to_eval.py`). | None |
 
 ---
 

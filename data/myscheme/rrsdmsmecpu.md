@@ -1,0 +1,115 @@
+# Revival and Rehabilitation Scheme for Defunct MSMEs and Cashew Processing Units
+
+**State/UT:** Kerala
+
+## Source
+
+- **Official source:** https://www.myscheme.gov.in/schemes/rrsdmsmecpu
+- **Origin:** myScheme national portal (dataset capture, Apache-2.0); verify on the official portal before applying.
+- **Data status:** myscheme_import
+
+## Jurisdiction
+
+- **Jurisdiction:** Kerala (as listed on myScheme)
+This is an automated import, not a hand-verified record.
+
+## Details
+
+Introduction:The trend in
+increasing number of defunct units is a challenge to the secondary sector. The MSMEs which have become defunct due to genuine issues
+in the value chain and have potential needs to be revived and rehabilitated considering the role of these units play in the state economy,
+the Government of Kerala launched a new scheme for defunct MSMEs including cashew processing units during 2020-21. 
+Besides the
+lack of improved technology, MSME units become defunct due to constraints on marketing, competition from MNCs and global
+challenges etc. In the field of cashew units the processing cost is comparatively higher in the state and competition from other countries
+is badly high. Most of the cashew units are in financial crunches. Process mechanization is the only way to revive the
+units.Objective:The scheme envisages supporting defunct MSMEs in the manufacturing sector including cashew processing units
+through assistance in the form of capital grants and working capital incentives.Definitions:Defunct MSMEs: MSMEs which are non-
+operational for 6 months or more but can be revivable. In the case of units which become defunct due to the plastic ban and those who
+wish for diversification, the above time limit is not applicable.Defunct Cashew Processing Units: The Cashew Processing Units which
+were defunct at least for six months/no matter whether they have received any Government assistance or bank loan within six months
+and are in the process of revival.
+
+## Benefits
+
+1. Entitlement in the scheme shall be limited to ₹15 Lakhs per applicant unit and it can avail
+only once.2. Financial Assistance under the scheme provided for the following components- 
+a) Building Renovation - 25% of the total
+revival project cost limited to ₹2 lakh: 
+i) Building Renovation includes maintenance and repair of existing factory buildings,
+construction of fresh 
+roofing in the factory shed, infrastructure for Waste Disposal / Treatment facilities etc. 
+b) Plant & Machinery and
+Electrification - 40% of the total revival project cot limited to ₹8 lakh: 
+i) It will be available for the purchase of new machinery, Repair
+and Maintenance of Existing machines, 
+industrial electrification etc. 
+c) Working Capital (Margin) - 50% margin of working Capital loan
+approved by financial institution subject to 
+i) Assistance is limited to ₹2 lakhs for defunct MSMEs. 
+ii) Assistance is limited to ₹5 lakhs
+for Cashew Units. 
+d) Maximum Limit ₹12 lakhs for defunct MSMEs per unit. 
+e) Maximum Limit ₹15 lakhs for defunct cashew
+processing per unit.Note 01: Bank Sanction of fresh working capital loan is mandatory for availing Working Capital (Margin)
+Assistance, but a bank loan is not mandatory for assistance for building renovation, plant and machinery, electrification etc.Note 02: The
+assistance under the scheme shall be released to the eligible entrepreneur by the bank on a pro-rata basis.
+
+## Eligibility
+
+All MSMEs in the
+manufacturing sector which are defunct for at least 6 months due to genuine issues including cashew processing enterprises that have the
+potential to be revived and rehabilitated, are eligible for assistance under the scheme.Obligations of the Applicant Entrepreneurs:The
+applicant shall provide all required details and declare such information as to be true.The applicant shall provide clarifications or further
+details sought by the recommending/ sanctioning authority.The applicant shall allow inspection or verification of any details mentioned
+in the application including plant and machinery and all other assets if so required by recommending/ sanctioning authority.The applicant
+shall produce originals of any important documents if so required by the recommending/ sanctioning authority for verification.The
+applicant shall execute the requisite legal agreement on Stamp paper worth ₹200 as and when the proposal is approved for
+implementation and furnishes the signed hard copy to General Manager, District Industries Centre.The applicant shall utilize the amount
+received only in the manner agreed upon as per the revival project submitted.The applicant shall operate the unit as stipulated in the
+agreement in which the quantum of support received, failing which the assistance shall be resumed by restoring the provisions of the
+Kerala Revenue Recovery Act.
+
+## Application Process
+
+OnlineStep 01: Application can be submitted online through the Official website of
+the Directorate of Industries & Commerce, Government of Kerala. The applicant needs to visit the official website.Step 02: The
+applicant may select the scheme “Revival and Rehabilitation Scheme for Defunct MSMEs and Cashew Processing Units” from the
+available Online Services listed on the home page and click on the “Apply Now” option. Clicking “Apply Now” redirects to the
+Login Page, if the user is a “new user”, use the “Registration” option and if already registered use the ‘Login’ option.Step
+03: A new user can register by filling in his/her details and after successful registration, the user can login.Step 04: After successful
+login, the applicant needs to select “New Application” and click on ‘Proceed’ Option.Step 05: Fill out the application form
+completely and submit it.
+
+## Documents Required
+
+1. Copy of Identity proof of applicant2. Udyog Aadhar/Udyam Registration3. Revival
+Project Report4. Title deed of land/land tax receipt if applicable5. Ownership Certificate of the building if applicable6. Registered Lease
+deed or rent deed in such cases7. Invoice/bill/Proof of payment of Plant, machinery and electrification8. Valuation of Approved Civil
+Engineer/ chartered Engineer for civil construction9. Sanction order of Bank for Working Capital Loan if any10. Audited Balance Sheet
+for the year before being defunct11. Any other document as demanded by the recommending/sanctioning authorityFrequently Asked
+QuestionsWhat are the objectives of the scheme?The objective of the scheme is to envisage supporting defunct MSMEs in the
+manufacturing sector including cashew processing units through assistance in the form of capital grants and working capital
+incentives.When did this scheme launch?The Government of Kerala launched the scheme for defunct MSMEs including cashew
+processing units during year 2020-21.Which is the implementing department of this scheme?Director of Industries & Commerce,
+Government of KeralaWhat does “Defunct MSME” means?MSMEs which are non-operational for 6 months or more but can be
+revivable. In the case of units which become defunct due to the plastic ban and those who wish for diversification, the above time limit is
+not applicable.What does “Defunct Cashew Processing Units” means?The “Cashew Processing Units” which were defunct at
+least for six months/no matter whether they have received any Government assistance or bank loan within six months and are in the
+process of revival.Which MSME units are eligible to get the benefits of the scheme?All MSMEs in the manufacturing sector which are
+defunct for at least 6 months due to genuine issues including cashew processing enterprises that have the potential to be revived and
+rehabilitated, are eligible for assistance under the scheme.What is the benefit of the scheme?Under the scheme, financial assistance of
+₹15 Lakhs will be given to an applicant unit.How many times an MSME unit can avail of the assistance under the scheme?Only once,
+an MSME unit can avail of assistance under the scheme.How shall an applicant unit receive assistance?The assistance under the scheme
+shall be released to the eligible entrepreneur by the bank on a pro-rata basis.How can an applicant unit apply under the scheme?
+Application can be submitted online through the Official website of the Directorate of Industries & Commerce, Government of Kerala.
+https://schemes.industry.kerala.gov.in/public/index.php/schemes
+
+## Sources And References
+
+Official WebsiteGuidelinesApplication
+PortalOkWas this helpful?
+
+## Disclaimer
+
+This record is an automated import from the myScheme portal and may be incomplete or outdated. It is not official advice; always verify eligibility and process on the official portal before applying.
