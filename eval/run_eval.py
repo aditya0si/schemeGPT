@@ -54,9 +54,10 @@ HISTORY_FILE = RESULTS_DIR / "history.jsonl"
 FAILURE_THRESHOLD = 0.70
 
 # Free-tier pacing: the answer pipeline (normalize + retrieval + answer) is
-# ~2k tokens per case against a shared 8k tokens/minute quota. A 20 s gap
-# keeps the sustained rate under ~6k TPM; the judge phase runs 2 workers.
-INTER_CASE_SLEEP_SECONDS = 20.0
+# ~2-6k tokens per case against a shared 8k tokens/minute quota (agent-routed
+# cases burst). A 40 s gap keeps the sustained rate comfortably under it;
+# the judge phase runs 2 workers with retries.
+INTER_CASE_SLEEP_SECONDS = 40.0
 RATE_LIMIT_BACKOFF_SECONDS = 65.0
 
 # Regression-gate floors (per aggre gate with --gate). Stricter than the
