@@ -214,6 +214,8 @@ def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
     model = (
         settings.groq_fast_model if role == "fast" else settings.groq_model
     )
+    if role == "judge" and settings.eval_judge_model.strip():
+        model = settings.eval_judge_model.strip()
     return ChatGroq(
         model=model,
         api_key=key,

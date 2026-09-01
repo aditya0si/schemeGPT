@@ -129,3 +129,36 @@ directory — paths are resolved relative to the script location).
 - Fabricate missing eligibility, benefit amounts, or deadlines.
 - Present a `directory_seed` record as a verified eligibility decision.
 - Introduce new `data_status` values silently.
+
+## myScheme import corpus (`data/myscheme/`)
+
+The scaled corpus layer: 2,052 scheme records imported from the published
+Hugging Face dataset `shrijayan/gov_myscheme` (Apache-2.0), which captured the
+public myScheme portal pages as PDFs. We deliberately do **not** scrape
+myscheme.gov.in directly: its `robots.txt` allows crawling but its Terms of
+Use restrict scraping tools, so we consume the licensed third-party
+redistribution instead and link every record back to its official page.
+
+Pipeline (`scripts/fetch_myscheme.py`):
+
+- lists the dataset via the HF API (paginated), skipping the dataset's
+  duplicated ` copy` files;
+- downloads each unique PDF into `data/.cache/myscheme_pdfs/` (git-ignored)
+  with an honest User-Agent and inter-request sleep;
+- extracts text with pypdf, repairs cp1252 mojibake, strips the myScheme page
+  chrome, and splits the known section headers (Details / Benefits /
+  Eligibility / Application Process / Documents Required / FAQs);
+- detects jurisdiction: a `Ministry Of ...` block means central; otherwise a
+  match against the 36 state/UT names from `data/india_states.json`;
+- writes one Markdown record per scheme into `data/myscheme/<slug>.md` with
+  `data_status: myscheme_import`, the official page URL, and a disclaimer.
+
+Honest boundaries for this corpus:
+
+- These are **automated imports**, never hand-verified records. They may be
+  incomplete or outdated; each record says so.
+- The answer layer treats `myscheme_import` chunks as discovery-grade
+  context: quotes from them are verified against the source text (same
+  mechanism as everything else), but they never upgrade a claim to
+  "verified eligibility".
+- Re-run the fetcher any time to refresh; unchanged files are not rewritten.

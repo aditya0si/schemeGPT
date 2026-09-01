@@ -277,7 +277,7 @@ def _score_rows(rows: list[dict[str, Any]]) -> None:
                 context_precision,
                 context_recall,
             ],
-            llm=get_llm(),
+            llm=get_llm("judge"),
             embeddings=get_embeddings(),
             raise_exceptions=False,
             show_progress=True,

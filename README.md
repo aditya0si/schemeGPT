@@ -315,11 +315,11 @@ cp .env.example .env && docker compose up -d --build
 
 | Variable | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `GROQ_API_KEY` | Optional | `""` (Demo Mode) | Groq API key for Llama-3.3-70b synthesis. Blank falls back to demo mode. |
+| `GROQ_API_KEY` | Optional | `""` (Demo Mode) | Groq API key for `openai/gpt-oss-120b` synthesis (and `gpt-oss-20b` normalization). Blank falls back to demo mode. |
 | `DATABASE_URL` | Yes | `postgresql://scheme:scheme@db:5432/schemegpt` | PostgreSQL connection string. |
 | `ADMIN_TOKEN` | Optional | `""` (Disabled) | Secret token required for authenticated `POST /ingest`. |
 | `STREAMLIT_API_URL` | No | `http://api:8000` | Internal API URL used by the Streamlit frontend container. |
-| `NEXT_PUBLIC_API_URL` | No | `http://localhost:8000` | Public API endpoint for Next.js browser client requests. |
+| `API_URL` | No | `http://localhost:8000` | API base URL for the Next.js server-side proxy (`/api/chat/stream`, `/api/chat/feedback`) — the browser only talks to Next.js, so CORS stays closed. |
 
 ### Production VPS Runbook
 
@@ -388,9 +388,9 @@ Offline evaluation measures retrieval and generation quality against curated cas
 | Metric | Target Floor | Description |
 | :--- | :--- | :--- |
 | **Faithfulness** | `>= 0.85` | Ensures answer claims are directly grounded in retrieved context chunks. |
-| **Answer Relevancy** | `>= 0.80` | Measures alignment between the user's question and generated response. |
-| **Context Precision** | `>= 0.75` | Evaluates rank-order precision of relevant scheme passages retrieved. |
-| **Context Recall** | `>= 0.75` | Verifies whether all ground-truth reference passages were retrieved. |
+| **Answer Relevancy** | `>= 0.70` | Measures alignment between the user's question and generated response. |
+| **Context Precision** | measured | Evaluates rank-order precision of relevant scheme passages retrieved (no gate floor yet; tracked per run). |
+| **Context Recall** | measured | Verifies whether all ground-truth reference passages were retrieved (no gate floor yet; tracked per run). |
 
 ```bash
 # Install evaluation dependencies

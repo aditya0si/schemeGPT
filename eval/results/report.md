@@ -1,6 +1,6 @@
 # SchemeGPT RAGAS Evaluation Report
 
-- Generated: `2026-09-01T18:13:19+00:00` (UTC)
+- Generated: `2026-09-01T19:30:21+00:00` (UTC)
 - Cases evaluated: 20 of 20
 - Command: `python -m eval.run_eval`
 - Threshold: **0.70** - any `faithfulness` or `answer_relevancy` score below this value (or a missing score) is a failure case.
@@ -20,8 +20,8 @@
 | Metric | This run | Previous | Delta |
 | --- | --- | --- | --- |
 | faithfulness | n/a | n/a | n/a |
-| answer_relevancy | n/a | 0.835 | n/a |
-| context_precision | 0.000 | 1.000 | -1.000 |
+| answer_relevancy | n/a | n/a | n/a |
+| context_precision | 0.000 | 0.000 | +0.000 |
 | context_recall | n/a | n/a | n/a |
 
 ## Per-Question Scores
@@ -60,15 +60,131 @@
 - **Answer**:
 
   ```text
-  Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY) provides a health cover of Rs 5 lakh per family per year, on a floater basis, for secondary and tertiary hospitalisation. Around 12 crore families (approximately 55 crore individuals) are covered, and treatment is cashless and paperless at empanelled hospitals anywhere in India.
+  > Cover: ₹5 lakh per family per year. [Ayushman Bharat (PM‑JAY), sample_verified]
   ```
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_precision, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199998, Requested 1457. Please try again in 10m28.56s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199999, Requested 2223. Please try again in 15m59.904s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199994, Requested 2740. Please try again in 19m41.088s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199977, Requested 1476. Please try again in 10m27.696s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
-  - (no contexts retrieved)
+  1. schemes/ayushman-bharat.md:
+
+     ```text
+     # Ayushman Bharat (PM-JAY)
+
+Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY) is the largest health
+insurance scheme in the world. It provides a health cover of ₹5 lakh per family per
+year for secondary and tertiary hospitalisation.
+
+## Source
+
+- **Official source:** https://pmjay.gov.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Eligibility follows the deprivation criteria of the Socio-Economic Caste
+  Census (SECC) 2011; beneficiaries are identified from the SECC 2011 database.
+- Rural families living in kutcha houses, or with no adult member aged 16-59,
+  qualify for the scheme.
+- Urban workers such as rag pickers, rickshaw pullers, and domestic workers
+  qualify for the scheme.
+     ```
+  2. schemes/ayushman-bharat.md:
+
+     ```text
+     ## Exclusions
+
+- Not specified in the official source.
+
+## Benefits
+
+- Cover: ₹5 lakh per family per year, on a floater basis.
+- Beneficiaries: around 12 crore families (approximately 55 crore individuals),
+  covering the bottom 40% of India's population.
+- Treatment: hospitalisation, surgeries, and pre/post-hospitalisation expenses.
+- Portability: benefits are portable anywhere in India.
+- Card: eligible families receive an Ayushman card; treatment is cashless and
+  paperless at empanelled hospitals (public and private).
+
+## Documents required
+
+- Not specified in the official source.
+
+## How to apply
+
+- Not specified in the official source.
+
+## Not official advice
+     ```
+  3. schemes/pmay-g.md:
+
+     ```text
+     # PMAY-G (Pradhan Mantri Awas Yojana - Gramin)
+
+Pradhan Mantri Awas Yojana - Gramin (PMAY-G) is a rural housing scheme that provides
+financial assistance to eligible rural households for constructing a pucca house
+with basic amenities.
+
+## Source
+
+- **Official source:** https://pmayg.nic.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Eligible households include families living in kutcha houses, houses with zero
+  or one room, and families that have no house at all.
+- Beneficiary selection is based on housing deprivation parameters from SECC
+  2011; selection is finalised through the Awaas+ survey and approved by the
+  Gram Sabha.
+
+## Exclusions
+
+- Not specified in the official source.
+     ```
+  4. schemes/pm-sym.md:
+
+     ```text
+     # PM-SYM (Pradhan Mantri Shram Yogi Maandhan)
+
+Pradhan Mantri Shram Yogi Maandhan (PM-SYM) is a pension scheme for unorganised
+workers. It provides a monthly pension of ₹3,000 after the subscriber attains the
+age of 60 years.
+
+## Source
+
+- **Official source:** https://labour.gov.in/pm-sym
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Unorganised workers with monthly income up to ₹15,000.
+- Entry age: 18 to 40 years.
+
+## Exclusions
+
+- Workers covered under EPFO or ESIC.
+- Income tax payers.
+
+## Benefits
+     ```
 
 ### 2. When was GST introduced in India and which indirect taxes did it subsume?
 
@@ -77,15 +193,119 @@
 - **Answer**:
 
   ```text
-  The Goods and Services Tax (GST) was introduced in India on 1 July 2017 and subsumed multiple indirect taxes such as VAT, service tax, and excise duty. Businesses above the turnover threshold must register: Rs 40 lakh for goods and Rs 20 lakh for services, with lower thresholds in some states. The main tax slabs are 5%, 12%, 18%, and 28%.
+  GST was rolled out in India on 1 July 2017. It replaced a bunch of older indirect taxes – mainly VAT, service tax and excise duty.  
+
+> The Goods and Services Tax (GST) … introduced in India on 1 July 2017. It subsumed multiple indirect taxes such as VAT, service tax, and excise duty. [GST Act, sample_verified]
   ```
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_precision, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199988, Requested 788. Please try again in 5m35.232s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199984, Requested 1516. Please try again in 10m48s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199982, Requested 2208. Please try again in 15m46.079999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199980, Requested 2649. Please try again in 18m55.728s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
-  - (no contexts retrieved)
+  1. schemes/gst.md:
+
+     ```text
+     # Goods and Services Tax (GST) Act
+
+The Goods and Services Tax (GST) is a comprehensive, multi-stage, destination-based
+tax levied on every value addition, introduced in India on 1 July 2017. It subsumed
+multiple indirect taxes such as VAT, service tax, and excise duty.
+
+## Source
+
+- **Official source:** https://www.gst.gov.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Businesses above the turnover threshold must register (₹40 lakh for goods and
+  ₹20 lakh for services, with lower thresholds in some states).
+- Small taxpayers with turnover up to ₹1.5 crore (₹75 lakh for services in some
+  cases) can opt for the composition scheme.
+
+## Exclusions
+
+- Not specified in the official source.
+     ```
+  2. schemes/gst.md:
+
+     ```text
+     ## Exclusions
+
+- Not specified in the official source.
+
+## Benefits
+
+- Structure: dual GST is levied by the Centre (CGST) and States (SGST);
+  inter-state supplies attract Integrated GST (IGST).
+- Slabs: the main tax slabs are 5%, 12%, 18%, and 28%. Some goods are exempt,
+  and a compensation cess applies to demerit goods.
+- GST Council: a constitutional body chaired by the Union Finance Minister that
+  decides rates and rules.
+- Input Tax Credit (ITC): credit of tax paid on inputs can be set off against
+  output tax liability.
+- Composition scheme: small taxpayers can pay a lower rate with limited
+  compliance.
+- Returns: registered taxpayers file returns such as GSTR-1 (outward supplies),
+  GSTR-3B (summary), and the annual return GSTR-9 through the GST portal or
+  offline tools.
+     ```
+  3. states/gujarat.md:
+
+     ```text
+     # Gujarat
+
+**Type:** State
+**Code:** GJ
+**Region:** West
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Gujarat. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Gujarat has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Gujarat on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+     ```
+  4. states/gujarat.md:
+
+     ```text
+     - MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+
+- income support
+- health
+- education
+- housing
+- jobs
+- agriculture
+- social security
+
+## Verification note
+
+This record has `data_status: directory_seed`. It is a discovery/coverage seed,
+not a verified eligibility decision. Before applying, always verify scheme-level
+eligibility for Gujarat against the official national MyScheme discovery portal
+and the issuing department.
+     ```
 
 ### 3. What is the GST registration turnover threshold for goods and for services?
 
@@ -94,15 +314,118 @@
 - **Answer**:
 
   ```text
-  The Goods and Services Tax (GST) was introduced in India on 1 July 2017 and subsumed multiple indirect taxes such as VAT, service tax, and excise duty. Businesses above the turnover threshold must register: Rs 40 lakh for goods and Rs 20 lakh for services, with lower thresholds in some states. The main tax slabs are 5%, 12%, 18%, and 28%.
+  The GST registration turnover threshold is **₹40 lakh for goods** and **₹20 lakh for services** (states may have lower limits).  
+
+> Businesses above the turnover threshold must register (₹40 lakh for goods and ₹20 lakh for services, with lower thresholds in some states). [Goods and Services Tax (GST) Act, sample_verified]
   ```
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_precision, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199978, Requested 1522. Please try again in 10m48s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199973, Requested 764. Please try again in 5m18.384s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199972, Requested 1460. Please try again in 10m18.624s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199968, Requested 2678. Please try again in 19m3.072s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
-  - (no contexts retrieved)
+  1. schemes/gst.md:
+
+     ```text
+     # Goods and Services Tax (GST) Act
+
+The Goods and Services Tax (GST) is a comprehensive, multi-stage, destination-based
+tax levied on every value addition, introduced in India on 1 July 2017. It subsumed
+multiple indirect taxes such as VAT, service tax, and excise duty.
+
+## Source
+
+- **Official source:** https://www.gst.gov.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Businesses above the turnover threshold must register (₹40 lakh for goods and
+  ₹20 lakh for services, with lower thresholds in some states).
+- Small taxpayers with turnover up to ₹1.5 crore (₹75 lakh for services in some
+  cases) can opt for the composition scheme.
+
+## Exclusions
+
+- Not specified in the official source.
+     ```
+  2. schemes/gst.md:
+
+     ```text
+     ## Exclusions
+
+- Not specified in the official source.
+
+## Benefits
+
+- Structure: dual GST is levied by the Centre (CGST) and States (SGST);
+  inter-state supplies attract Integrated GST (IGST).
+- Slabs: the main tax slabs are 5%, 12%, 18%, and 28%. Some goods are exempt,
+  and a compensation cess applies to demerit goods.
+- GST Council: a constitutional body chaired by the Union Finance Minister that
+  decides rates and rules.
+- Input Tax Credit (ITC): credit of tax paid on inputs can be set off against
+  output tax liability.
+- Composition scheme: small taxpayers can pay a lower rate with limited
+  compliance.
+- Returns: registered taxpayers file returns such as GSTR-1 (outward supplies),
+  GSTR-3B (summary), and the annual return GSTR-9 through the GST portal or
+  offline tools.
+     ```
+  3. schemes/gst.md:
+
+     ```text
+     ## Documents required
+
+- Not specified in the official source.
+
+## How to apply
+
+- Not specified in the official source (the record states that businesses above
+  the turnover threshold must register, but does not describe the application
+  process).
+
+## Not official advice
+
+This record is a `sample_verified` entry: facts were checked against the
+official national MyScheme discovery portal on 2026-08-02, but government
+schemes change. SchemeGPT is a discovery assistant, not an official eligibility
+decision. Before applying, re-verify eligibility, exclusions, and documents on
+the official national discovery portal above.
+     ```
+  4. states/gujarat.md:
+
+     ```text
+     # Gujarat
+
+**Type:** State
+**Code:** GJ
+**Region:** West
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Gujarat. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Gujarat has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Gujarat on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+     ```
 
 ### 4. How much income support does PM-KISAN provide and in what instalments is it paid?
 
@@ -116,7 +439,7 @@
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199052, Requested 1443. Please try again in 3m33.84s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199050, Requested 1891. Please try again in 6m46.512s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199048, Requested 1675. Please try again in 5m12.336s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199970, Requested 1463. Please try again in 10m19.056s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199967, Requested 1443. Please try again in 10m9.12s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199963, Requested 1982. Please try again in 14m0.239999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
   - (no contexts retrieved)
@@ -213,15 +536,133 @@
 - **Answer**:
 
   ```text
-  This question is outside the pre-made demo topics, and the live Groq answer service is not configured or is currently unavailable, so no retrieval or LLM answer could be produced. The demo fallback covers PM-KISAN, Ayushman Bharat PM-JAY, PMAY-G, PM-SYM, Startup India, and GST. Add a valid GROQ_API_KEY and restart the API to enable live RAG answers.
+  SchemeGPT covers the Union Territories that are listed as “directory seed” entries – for example Puducherry, Andaman and Nicobar Islands, Ladakh and Jammu and Kashmir.  
+
+Each entry is basically a **discovery/coverage record** that tells you two things:
+
+1. **Coverage** – SchemeGPT can look up any nationwide central‑government scheme for that jurisdiction.  
+2. **What’s NOT verified yet** – The portal does **not** claim any specific state‑level scheme names, benefit amounts or eligibility decisions for that UT; you’ll need to check the official MyScheme portal for the exact details.
+
+> This is a discovery/coverage directory seed for Puducherry. It confirms that SchemeGPT covers this jurisdiction for nationwide scheme search and points citizens to the official national discovery portal. Scheme-level eligibility for Puducherry has not been individually verified yet, and no state scheme names, benefit amounts, or eligibility decisions are claimed here. [Puducherry, directory_seed]
+
+The same wording appears for the other Union Territories (Andaman and Nicobar Islands, Ladakh, Jammu and Kashmir). So, when you see a state or UT entry, it’s basically saying: “We can search for schemes that apply here, but you should go to the MyScheme portal (https://www.myscheme.gov.in/) for the final, verified eligibility and benefit details.”
   ```
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_precision, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199960, Requested 1764. Please try again in 12m24.767999999s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199958, Requested 997. Please try again in 6m52.56s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199956, Requested 1471. Please try again in 10m16.464s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199952, Requested 2703. Please try again in 19m6.96s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
-  - (no contexts retrieved)
+  1. states/puducherry.md:
+
+     ```text
+     # Puducherry
+
+**Type:** Union Territory
+**Code:** PY
+**Region:** South
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Puducherry. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Puducherry has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Puducherry on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+     ```
+  2. states/andaman-and-nicobar-islands.md:
+
+     ```text
+     # Andaman and Nicobar Islands
+
+**Type:** Union Territory
+**Code:** AN
+**Region:** South
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Andaman and Nicobar Islands. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Andaman and Nicobar Islands has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Andaman and Nicobar Islands on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+     ```
+  3. states/ladakh.md:
+
+     ```text
+     # Ladakh
+
+**Type:** Union Territory
+**Code:** LA
+**Region:** North
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Ladakh. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Ladakh has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Ladakh on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+     ```
+  4. states/jammu-and-kashmir.md:
+
+     ```text
+     # Jammu and Kashmir
+
+**Type:** Union Territory
+**Code:** JK
+**Region:** North
+**Data status:** `directory_seed`
+**Last verified:** 2026-08-02
+
+## What this record is
+
+This is a discovery/coverage directory seed for Jammu and Kashmir. It confirms that
+SchemeGPT covers this jurisdiction for nationwide scheme search and points
+citizens to the official national discovery portal. Scheme-level eligibility
+for Jammu and Kashmir has not been individually verified yet, and no state scheme names,
+benefit amounts, or eligibility decisions are claimed here.
+
+## Official discovery
+
+Search for schemes available in Jammu and Kashmir on the official national MyScheme
+discovery portal:
+
+- MyScheme (official national discovery portal): https://www.myscheme.gov.in/
+
+## Categories you can explore
+     ```
 
 ### 11. I am a 35-year-old unorganised worker earning about 12,000 rupees per month in rural Karnataka. Which central pension scheme could match my profile?
 
@@ -264,17 +705,131 @@
 - **Answer**:
 
   ```text
-  PM-KISAN (Pradhan Mantri Kisan Samman Nidhi) is a central sector scheme that provides income support of Rs 6,000 per year to eligible landholding farmer families in India. The amount is paid directly into the beneficiary's bank account through Direct Benefit Transfer (DBT) in three equal instalments of Rs 2,000 each, released every four months.
+  PM‑KISAN का पैसा साल में ₹6,000 मिलता है, जो तीन बराबर किस्तों में बाँटा जाता है। हर किस्त ₹2,000 की होती है और **हर चार महीने में एक‑एक instalment रिलीज़ होता है**।  
 
-> eligible farmers receive Rs 6,000 per year, paid directly into their bank accounts through Direct Benefit Transfer (DBT). [schemes/pm-kisan.md, sample_verified]
+> Payment: ₹6,000 per year, paid in three equal instalments of ₹2,000 each. Frequency: instalments are released every four months. [PM‑KISAN (Pradhan Mantri Kisan Samman Nidhi), sample_verified]
   ```
 
 - **faithfulness**: n/a
 - **answer_relevancy**: n/a
-- **Error**: Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+- **Error**: evaluation error: RAGAS did not return a score for faithfulness, answer_relevancy, context_precision, context_recall; RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199952, Requested 816. Please try again in 5m31.776s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199949, Requested 1548. Please try again in 10m46.704s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199948, Requested 1460. Please try again in 10m8.256s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}); RateLimitError(Error code: 429 - {'error': {'message': 'Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_01ks7njm54ehm9mbfdc97rda95\` service tier \`on_demand\` on tokens per day (TPD): Limit 200000, Used 199943, Requested 2737. Please try again in 19m17.76s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}})
 
 - **Retrieved sources/contexts**:
-  - (no contexts retrieved)
+  1. schemes/pm-kisan.md:
+
+     ```text
+     # PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)
+
+PM-KISAN is a central sector scheme that provides income support to landholding
+farmer families in India. Under the scheme, eligible farmers receive ₹6,000 per
+year, paid directly into their bank accounts through Direct Benefit Transfer (DBT).
+
+## Source
+
+- **Official source:** https://pmkisan.gov.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- All landholding farmer families with cultivable land.
+
+## Exclusions
+
+- Institutional landholders.
+- Farmer families where any member pays income tax.
+- Families with a government employee in a higher grade.
+- Duplicate or ineligible beneficiaries are removed through periodic
+  verification drives.
+     ```
+  2. schemes/pm-kisan.md:
+
+     ```text
+     ## Benefits
+
+- Payment: ₹6,000 per year, paid in three equal instalments of ₹2,000 each.
+- Frequency: instalments are released every four months.
+- The scheme was launched in February 2019.
+- As of the 2024-25 financial year, over 11 crore farmer families have received
+  support.
+
+## Documents required
+
+- Aadhaar.
+- Bank account details.
+- Land records.
+- Farmers must keep their Aadhaar linked to their bank account to continue
+  receiving instalments.
+
+## How to apply
+
+1. Enroll through the online PM-KISAN portal or Common Service Centres (CSCs).
+
+## Not official advice
+     ```
+  3. schemes/pmay-g.md:
+
+     ```text
+     # PMAY-G (Pradhan Mantri Awas Yojana - Gramin)
+
+Pradhan Mantri Awas Yojana - Gramin (PMAY-G) is a rural housing scheme that provides
+financial assistance to eligible rural households for constructing a pucca house
+with basic amenities.
+
+## Source
+
+- **Official source:** https://pmayg.nic.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Eligible households include families living in kutcha houses, houses with zero
+  or one room, and families that have no house at all.
+- Beneficiary selection is based on housing deprivation parameters from SECC
+  2011; selection is finalised through the Awaas+ survey and approved by the
+  Gram Sabha.
+
+## Exclusions
+
+- Not specified in the official source.
+     ```
+  4. schemes/ayushman-bharat.md:
+
+     ```text
+     # Ayushman Bharat (PM-JAY)
+
+Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY) is the largest health
+insurance scheme in the world. It provides a health cover of ₹5 lakh per family per
+year for secondary and tertiary hospitalisation.
+
+## Source
+
+- **Official source:** https://pmjay.gov.in/
+- **Checked on:** 2026-08-02
+- **Data status:** sample_verified
+
+## Jurisdiction
+
+- **Jurisdiction:** Central government
+
+## Eligibility
+
+- Eligibility follows the deprivation criteria of the Socio-Economic Caste
+  Census (SECC) 2011; beneficiaries are identified from the SECC 2011 database.
+- Rural families living in kutcha houses, or with no adult member aged 16-59,
+  qualify for the scheme.
+- Urban workers such as rag pickers, rickshaw pullers, and domestic workers
+  qualify for the scheme.
+     ```
 
 ### 14. kisan ko sarkar har saal kitne rupaye deti hai
 

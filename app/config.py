@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # OpenTelemetry OTLP endpoint (e.g. http://localhost:4318). Leave blank to
     # disable tracing entirely (zero overhead no-op spans).
     otel_exporter_otlp_endpoint: str = ""
+    # Judge model for the RAGAS eval harness. Defaults to the answer model;
+    # override (e.g. the smaller fast model) to fit an eval run inside a
+    # separate per-model daily-token bucket on the free tier.
+    eval_judge_model: str = ""
     data_dir: str = "data/schemes"
     # Admin token required for POST /ingest via the X-Admin-Token header.
     # Leave blank to disable manual re-ingestion (startup auto-ingestion is
