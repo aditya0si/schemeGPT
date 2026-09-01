@@ -36,6 +36,7 @@ import math
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,12 @@ HISTORY_FILE = RESULTS_DIR / "history.jsonl"
 # Single project-wide triage threshold. Any metric below this value (or
 # missing because of an evaluation error) flags a failure case.
 FAILURE_THRESHOLD = 0.70
+
+# Free-tier pacing: the answer pipeline (normalize + retrieval + answer) is
+# ~2k tokens per case against a shared tokens/minute quota. Space the cases
+# out and back off once when a case trips the limit.
+INTER_CASE_SLEEP_SECONDS = 5.0
+RATE_LIMIT_BACKOFF_SECONDS = 65.0
 
 # Regression-gate floors (per aggre gate with --gate). Stricter than the
 # per-case triage threshold; failing a floor makes the command exit non-zero.
@@ -198,6 +205,12 @@ def _run_pipeline(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         try:
             result = answer(question, language=language, profile=profile)
             if result.get("mode") == "demo":
+                # Most common cause: the shared free-tier per-minute token
+                # limit tripped (the answer chain + normalization are ~2k
+                # tokens). Back off once before giving up on the case.
+                time.sleep(RATE_LIMIT_BACKOFF_SECONDS)
+                result = answer(question, language=language, profile=profile)
+            if result.get("mode") == "demo":
                 row["answer"] = result.get("answer", "")
                 row["error"] = DEMO_FALLBACK_ERROR
             else:
@@ -208,6 +221,9 @@ def _run_pipeline(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         except Exception as exc:  # DB/embedding/chain failure - record and keep going
             row["error"] = f"{type(exc).__name__}: {exc}"
         rows.append(row)
+        # Steady pacing keeps ~20 sequential cases inside the free tier's
+        # tokens/minute window instead of bursting all at once.
+        time.sleep(INTER_CASE_SLEEP_SECONDS)
     return rows
 
 
@@ -251,6 +267,8 @@ def _score_rows(rows: list[dict[str, Any]]) -> None:
     collector = _ErrorCollector()
     logging.getLogger("ragas.executor").addHandler(collector)
     try:
+        from ragas.run_config import RunConfig
+
         result = evaluate(
             dataset=hf_dataset,
             metrics=[
@@ -263,6 +281,10 @@ def _score_rows(rows: list[dict[str, Any]]) -> None:
             embeddings=get_embeddings(),
             raise_exceptions=False,
             show_progress=True,
+            # The Groq free tier is rate-limited (requests AND tokens per
+            # minute, shared with the answer pipeline): a small worker pool
+            # with retries avoids the judge calls timing out en masse.
+            run_config=RunConfig(timeout=180, max_workers=2, max_retries=3, max_wait=60),
         )
     finally:
         logging.getLogger("ragas.executor").removeHandler(collector)
