@@ -162,3 +162,39 @@ def test_token_usage_handler_tolerates_missing_usage():
     handler = TokenUsageHandler()
     handler.on_llm_end(EmptyResponse())
     assert handler.prompt_tokens == 0
+
+
+# --- openTelemetry tracing ------------------------------------------------
+
+
+def test_tracing_disabled_without_endpoint():
+    """No OTLP endpoint configured: setup is a no-op and spans are safe."""
+    from fastapi import FastAPI
+
+    from app.tracing import setup_tracing, stage_span
+
+    assert setup_tracing(FastAPI()) is False
+    with stage_span("test_span") as span:
+        if span is not None:
+            span.set_attribute("k", "v")
+
+
+def test_stage_span_records_when_sdk_active():
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    from app.tracing import get_tracer
+
+    provider = TracerProvider()
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+    with get_tracer().start_as_current_span("rag_stage") as span:
+        span.set_attribute("docs.count", 4)
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 1
+    assert spans[0].attributes["docs.count"] == 4

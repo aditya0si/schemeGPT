@@ -29,6 +29,7 @@ from app.catalog import load_scheme_catalog_records
 from app.config import ROOT_DIR, settings
 from app.db import get_vectorstore
 from app.schemas import ProfileData
+from app.tracing import stage_span
 
 logger = logging.getLogger(__name__)
 
@@ -491,15 +492,23 @@ def answer(
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
     ph = semantic_cache.profile_hash(profile)
-    cached = semantic_cache.lookup(question, lang, ph)
+    with stage_span("cache_lookup") as span:
+        cached = semantic_cache.lookup(question, lang, ph)
+        if span is not None:
+            span.set_attribute("cache.hit", cached is not None)
     if cached is not None:
         return {**cached, "cached": True}
     try:
         usage = TokenUsageHandler()
-        result = build_chain(lang).invoke(
-            {"input": question, "profile_context": profile_context},
-            config={"callbacks": [usage]},
-        )
+        with stage_span("rag_chain") as span:
+            result = build_chain(lang).invoke(
+                {"input": question, "profile_context": profile_context},
+                config={"callbacks": [usage]},
+            )
+            if span is not None:
+                span.set_attribute(
+                    "tokens.total", usage.prompt_tokens + usage.completion_tokens
+                )
         usage.record(settings.groq_model)
     except Exception as exc:
         # Fallback boundary: never leak exception text (which can contain

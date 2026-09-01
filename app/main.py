@@ -13,6 +13,7 @@ from app.db import COLLECTION_NAME, get_engine
 from app.rag import answer
 from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
+from app.tracing import setup_tracing
 from app.schemas import (
     ProfileCreateResponse,
     ProfileData,
@@ -72,6 +73,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SchemeGPT", lifespan=lifespan)
+
+# OpenTelemetry: no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is configured.
+setup_tracing(app)
 
 app.add_middleware(
     CORSMiddleware,

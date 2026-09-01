@@ -34,6 +34,7 @@ from app.rag import (
 from app.config import settings
 from app.quotes import parse_quotes, verify_quotes
 from app.schemas import ProfileData
+from app.tracing import stage_span
 
 logger = logging.getLogger(__name__)
 
@@ -97,47 +98,58 @@ async def stream_answer(
         if needs_multi_step(question, profile):
             metrics.inc("agent_routes_total")
             try:
-                docs, steps = await anyio.to_thread.run_sync(
-                    run_agent_gather, question, lang, profile
-                )
+                with stage_span("agent_gather"):
+                    docs, steps = await anyio.to_thread.run_sync(
+                        run_agent_gather, question, lang, profile
+                    )
             except Exception as exc:
                 # Agent loop failed: degrade to single-shot retrieval rather
                 # than dropping to demo mode for a live-configured stack.
                 logger.warning("Agent retrieval failed (%s); single-shot path.", type(exc).__name__)
-                normalized = await anyio.to_thread.run_sync(
-                    normalize_question, question
-                )
-                docs = await anyio.to_thread.run_sync(
-                    lambda: get_retriever().invoke(normalized)
-                )
+                with stage_span("normalize"):
+                    normalized = await anyio.to_thread.run_sync(
+                        normalize_question, question
+                    )
+                with stage_span("retrieve") as span:
+                    docs = await anyio.to_thread.run_sync(
+                        lambda: get_retriever().invoke(normalized)
+                    )
+                    if span is not None:
+                        span.set_attribute("docs.count", len(docs))
                 steps = []
             for step in steps:
                 yield _sse("step", step)
         else:
-            normalized = await anyio.to_thread.run_sync(
-                normalize_question, question
-            )
-            docs = await anyio.to_thread.run_sync(
-                lambda: get_retriever().invoke(normalized)
-            )
+            with stage_span("normalize"):
+                normalized = await anyio.to_thread.run_sync(
+                    normalize_question, question
+                )
+            with stage_span("retrieve") as span:
+                docs = await anyio.to_thread.run_sync(
+                    lambda: get_retriever().invoke(normalized)
+                )
+                if span is not None:
+                    span.set_attribute("docs.count", len(docs))
         yield _sse("sources", [_source_dict(doc) for doc in docs])
         chain = build_answer_chain(lang)
         usage = TokenUsageHandler()
-        async for chunk in chain.astream(
-            {
-                "context": docs,
-                "input": question,
-                "profile_context": profile_context,
-            },
-            config={"callbacks": [usage]},
-        ):
-            text = chunk if isinstance(chunk, str) else str(chunk)
-            if not text:
-                continue
-            tokens_sent = True
-            answer_parts.append(text)
-            yield _sse("token", {"text": text})
-        verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
+        with stage_span("generate"):
+            async for chunk in chain.astream(
+                {
+                    "context": docs,
+                    "input": question,
+                    "profile_context": profile_context,
+                },
+                config={"callbacks": [usage]},
+            ):
+                text = chunk if isinstance(chunk, str) else str(chunk)
+                if not text:
+                    continue
+                tokens_sent = True
+                answer_parts.append(text)
+                yield _sse("token", {"text": text})
+        with stage_span("verify_quotes"):
+            verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
         usage.record(settings.groq_model)

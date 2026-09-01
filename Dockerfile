@@ -11,6 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements-api.txt requirements.txt ./
 RUN pip install --no-cache-dir -r requirements-api.txt
 
+# Bake the default embedding model into the image so container starts are
+# fast and do not depend on Hugging Face availability at runtime. Must match
+# the EMBEDDING_MODEL setting (intfloat/multilingual-e5-small).
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small')"
+
 COPY app ./app
 COPY data ./data
 

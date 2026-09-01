@@ -14,3 +14,9 @@ pydantic-settings==2.8.1
 python-multipart==0.0.20
 # streamlit and requests are NOT part of the API image. They are installed only
 # for the Streamlit demo via requirements-streamlit.txt (Dockerfile.streamlit).
+
+# OpenTelemetry tracing (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-fastapi==0.65b0

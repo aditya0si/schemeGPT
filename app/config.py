@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Per-IP token-bucket rate limit for /query and /query/stream (requests
     # per minute; 0 disables). Protects the shared Groq free-tier quota.
     rate_limit_rpm: int = 20
+    # OpenTelemetry OTLP endpoint (e.g. http://localhost:4318). Leave blank to
+    # disable tracing entirely (zero overhead no-op spans).
+    otel_exporter_otlp_endpoint: str = ""
     data_dir: str = "data/schemes"
     # Admin token required for POST /ingest via the X-Admin-Token header.
     # Leave blank to disable manual re-ingestion (startup auto-ingestion is
