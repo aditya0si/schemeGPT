@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # CPU). Keep OFF on small free-tier VPSes; retrieval still fuses vector +
     # full-text without it.
     enable_reranker: bool = False
+    # Semantic query cache (pgvector-backed). Serves stored live answers for
+    # paraphrased repeats of a question (cosine >= 0.95, same language and
+    # profile). Disable with ENABLE_SEMANTIC_CACHE=false.
+    enable_semantic_cache: bool = True
+    # Per-IP token-bucket rate limit for /query and /query/stream (requests
+    # per minute; 0 disables). Protects the shared Groq free-tier quota.
+    rate_limit_rpm: int = 20
     data_dir: str = "data/schemes"
     # Admin token required for POST /ingest via the X-Admin-Token header.
     # Leave blank to disable manual re-ingestion (startup auto-ingestion is

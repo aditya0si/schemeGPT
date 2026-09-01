@@ -24,12 +24,39 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
+from app import semantic_cache
 from app.catalog import load_scheme_catalog_records
 from app.config import ROOT_DIR, settings
 from app.db import get_vectorstore
 from app.schemas import ProfileData
 
 logger = logging.getLogger(__name__)
+
+# Reference list price per 1M tokens (USD), for cost accounting only; Groq's
+# free tier does not bill, so this is an estimate of what the usage would cost
+# at list price. Subject to provider changes — never a billing record.
+PRICE_PER_MTOK = {
+    "openai/gpt-oss-120b": (0.15, 0.75),
+    "openai/gpt-oss-20b": (0.10, 0.50),
+}
+
+
+class TokenUsageHandler:
+    """LangChain callback that accumulates per-request LLM token usage."""
+
+    def __init__(self) -> None:
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+
+    def on_llm_end(self, response, *args, **kwargs) -> None:
+        usage = (getattr(response, "llm_output", None) or {}).get("token_usage") or {}
+        self.prompt_tokens += usage.get("prompt_tokens", 0) or 0
+        self.completion_tokens += usage.get("completion_tokens", 0) or 0
+
+    def record(self, model: str) -> None:
+        from app import metrics
+
+        metrics.observe_tokens(model, self.prompt_tokens, self.completion_tokens)
 
 # Config fingerprint label for evaluation runs: bump when answer prompts
 # meaningfully change so score deltas can be attributed to a prompt version.
@@ -463,10 +490,17 @@ def answer(
     """
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
+    ph = semantic_cache.profile_hash(profile)
+    cached = semantic_cache.lookup(question, lang, ph)
+    if cached is not None:
+        return {**cached, "cached": True}
     try:
+        usage = TokenUsageHandler()
         result = build_chain(lang).invoke(
-            {"input": question, "profile_context": profile_context}
+            {"input": question, "profile_context": profile_context},
+            config={"callbacks": [usage]},
         )
+        usage.record(settings.groq_model)
     except Exception as exc:
         # Fallback boundary: never leak exception text (which can contain
         # provider details or connection strings) to the browser, and never log
@@ -490,9 +524,11 @@ def answer(
         }
         for doc in result.get("context", [])
     ]
-    return {
+    payload = {
         "answer": result.get("answer", ""),
         "sources": sources,
         "mode": "live",
         "language": lang,
     }
+    semantic_cache.store(question, lang, ph, payload)
+    return payload

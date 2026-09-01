@@ -1,0 +1,116 @@
+# Assistance to Training Institutions Scheme
+
+**Ministry:** Micro
+
+## Source
+
+- **Official source:** https://www.myscheme.gov.in/schemes/ati
+- **Origin:** myScheme national portal (dataset capture, Apache-2.0); verify on the official portal before applying.
+- **Data status:** myscheme_import
+
+## Jurisdiction
+
+- **Jurisdiction:** central (as listed on myScheme)
+This is an automated import, not a hand-verified record.
+
+## Details
+
+The scheme “Assistance to Training Institutions (ATI) Scheme” was
+launched by the Ministry of Micro, Small & Medium Enterprises, Government of India. Under the scheme, assistance would be provided
+to the training institutions under the Ministry of MSME for the creation, strengthening and expansion of infrastructure, including the
+setting up of new branches and centres. Further, assistance would be provided for meeting any revenue deficit with the National Institute
+for Micro, Small and Medium Enterprises (NIMSME). 
+The financial assistance under the scheme to a state-level EDI will be restricted to
+a maximum of ₹300 lakhs in each case. This financial assistance would be utilized for the development of physical infrastructure,
+procuring equipment, faculty training and the development of capability in undertaking studies and research on issues related to the
+MSME sector. This financial assistance would be over and above the grant, if any, received by that institution earlier under the ATI
+scheme. To receive financial assistance under this scheme, an EDI owned and controlled by a State Government or UT would be selected
+on the recommendation of the State Government or the UT.Objective:The objective of the ATI Scheme is to strengthen the capacity for
+training for Skill Development, and entrepreneurship, providing training to staff of DICs and related Government institutions dealing
+with MSMEs and strengthening the overall capacity of National Institutions under the Ministry of MSME to undertake these trainings.
+Under the Skill India Programme, skill training is being given in accordance with the modules approved by the National Skill
+Qualification Framework (NSQF). The major objective of the scheme is the upgradation of physical infrastructure and training skills of
+Trainers in National Level Institutions under the Ministry of MSME. The scheme also proposes to improve the capacity of staff working
+in District Industries Centres and Industries Departments in the states.
+
+## Benefits
+
+Assistance under the Scheme:Scale of Assistance to
+Training Institutions of the Ministry of MSME:The amount of assistance will not exceed the actual amount required for the creation or
+strengthening/expansion of the infrastructure of the training institution and meeting the revenue deficit, etc. of NI-MSME.Scale of
+Assistance to State-Level EDIs:The maximum assistance under the scheme to a State level EDI will be restricted to ₹3.00 Crore in each
+case. This grant would be utilized for the development of physical infrastructure, equipment, faculty training, and development of
+capability for imparting skill development training related to the MSME sector. This grant would be over and above the grant, if any,
+received by that institution earlier under the ATI scheme.For the purpose of grant under this category, an EDI owned and controlled by a
+State Government/UT would be selected as recommended by the State Government.Note: The assisted EDI shall be required to complete
+the construction within the given timeframe and shall have to furnish the utilization certificate of the assistance sanctioned within the
+period prescribed in the sanction letter. In the event of a delay in the completion of the project, an extension of the time limit will have to
+be obtained from the Ministry of MSME with justifications.Scale of Assistance for Training Programmes:1. Assistance for skill
+development programmes under the scheme would be provided based on the duration of the NSQF-compliant training programmes
+(number of hours of training inputs). The cost of a training programme would be determined as per the following base rates notified by
+the Ministry of Skill Development and Entrepreneurship vide Notification No.H22011/2/2014-SDE-I dated 15.07.2015 as amended from
+time to time:- 
+Category I Courses: ₹38.50 per head per hour of training. 
+Category II Courses: ₹33.00 per head per hour of training.
+Category III Courses: ₹27.50 per head per hour of training. 2. The first installment of the grant would be released in advance. The
+subsequent installments would be released based on the progress of the utilization of funds already released.3. Assistance for Training of
+Trainers (ToTs) programmes would be provided @ ₹60 per trainee per hour (or, the rate prescribed under the common norms/NSQF,
+whichever is less).4. Assistance for other types of training programmes would be decided based on the actual requirement in each case.5.
+The total amount of assistance to be considered for release as per the above rate will include the cost of overheads such as, motivation
+camps the for selection of eligible trainees, charges towards hiring of space and equipment (if any), electricity/water, stationary, man
+hour cost of deployment of project personnel, post-training follow-up activities, etc.6. The trainees would be expected to make their own
+arrangements for travel and stay during the training period. In case the residential facility is provided by the Training Institution, it may
+charge the same from the trainee (subject to common norms/NSQF). It would be permissible to dovetail the assistance under this scheme
+with facilities/benefits available under schemes of other Ministries/Departments/State/UT Governments etc. for reimbursement of travel,
+boarding, and lodging expenses and stipend, etc. However, it would be the responsibility of the Training Institution to ensure that there is
+no duplication and that assistance for the same purpose is not claimed under more than one scheme.
+
+## Eligibility
+
+criteria for assistance for Training
+Programmes:Assistance may be provided under the scheme to conduct training programmes in the areas of Skill Development to the
+following Training Institutions:- (a) NI-MSME, (b) NSIC, (c) KVIC, (d) Coir Board, (e) Tool Rooms/Technology Centres, and (f)
+MGIRI.The financial assistance under this scheme would be of a revenue nature.Central Government may prescribe such other
+conditions, as necessary, before sanction/release of assistance.
+
+## Application Process
+
+:Step 01:
+The proposals for assistance shall be processed for submission to the Screening Committee for consideration.Step 02: The Screening
+Committee shall examine all the proposals received under the scheme and submit its recommendations to the Secretary (MSME).Step 03:
+After approval of the Secretary (MSME), administrative approval shall be conveyed to the applicant organization, and admissible
+financial assistance shall be released in accordance with the approval letter. It is clarified that private training institutions/NGOs are not
+covered under the scheme for assistance for infrastructure support and training programmes. 
+Miscellaneous:An online mechanism for
+maintaining the details related to beneficiaries is already in place @ www.ati.msme.gov.in. To meet the expenditure related to Aadhaar
+authentication services and maintenance/development of online software and other miscellaneous/administrative expenses related to the
+Scheme will be met from the budget provision (General Head) under the Scheme.
+
+## Documents Required
+
+1. Copy of PAN Card2. MSME
+registration certificate/ Udyam Registration of the unit3. Bank account details4. Any other document, as requiredFrequently Asked
+QuestionsWhat is the “Assistance to Training Institutions Scheme”?Under the scheme, assistance would be provided to the training
+institutions under the Ministry of MSME for creation, strengthening and expansion of infrastructure, including setting-up of new
+branches and centres. Further, assistance would be provided for meeting any revenue deficit with the National Institute for Micro, Small
+and Medium Enterprises (NIMSME).What is the objective of the scheme?The objective of the scheme is to strengthen and create
+infrastructure and facilitate and provide assistance for entrepreneurship and related skill development training programmes.Which is the
+implementing department of this scheme?Ministry of Micro, Small & Medium Enterprises, Government of IndiaWhich types of
+institutions are eligible to get the benefits of the scheme?The benefits, under the scheme, can be availed only by the training institutions
+of the Ministry of MSME and the State-level EDIs.What are the key benefits of the scheme?Under the scheme, support would be
+provided for infrastructure and capacity building of training institutions under the Ministry of MSME and the existing State level EDIs.
+Further, the scheme would provide support to all skill development programmes, carried by the training institutions of the Ministry of
+MSME.How to apply under the scheme?The proposals from national and state level EDIs, training institutions of M/o MSME etc. for
+grant of financial assistance under the scheme shall be submitted to the Deputy Secretary/Director (EDI), M/o MSME, Udyog Bhawan,
+New Delhi 110011.How shall the progress of the scheme regularly be monitored?The progress of the scheme shall be regularly
+monitored by the Screening Committee/Secretary (MSME) from time to time. An online mechanism for maintaining the details related to
+beneficiaries is also in place. The overall impact of the scheme shall be got evaluated by an independent agency at the end of the
+Fifteenth Finance Commission Cycle i.e. 2025-26.
+
+## Sources And References
+
+GuidelinesInvest India PortalWebsiteOkWas this helpful?
+
+## Disclaimer
+
+This record is an automated import from the myScheme portal and may be incomplete or outdated. It is not official advice; always verify eligibility and process on the official portal before applying.

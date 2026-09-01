@@ -19,7 +19,7 @@ from typing import AsyncIterator
 
 import anyio
 
-from app import metrics
+from app import metrics, semantic_cache
 from app.agent import needs_multi_step, run_agent_gather
 from app.rag import (
     _build_profile_context,
@@ -29,7 +29,9 @@ from app.rag import (
     get_llm,
     get_retriever,
     normalize_question,
+    TokenUsageHandler,
 )
+from app.config import settings
 from app.quotes import parse_quotes, verify_quotes
 from app.schemas import ProfileData
 
@@ -73,6 +75,25 @@ async def stream_answer(
     try:
         # Fail fast (no key -> ValueError) before touching the DB.
         get_llm()
+        # Semantic cache: serve a stored live answer for a semantically equal
+        # question (same language + profile) with the identical event shape.
+        ph = semantic_cache.profile_hash(profile)
+        cached = await anyio.to_thread.run_sync(
+            semantic_cache.lookup, question, lang, ph
+        )
+        if cached is not None:
+            yield _sse("sources", cached.get("sources", []))
+            answer_text = cached.get("answer", "")
+            for i in range(0, len(answer_text), 80):
+                yield _sse("token", {"text": answer_text[i : i + 80]})
+            if cached.get("quotes"):
+                yield _sse("quotes", cached["quotes"])
+            metrics.inc("queries_live")
+            yield _sse(
+                "done",
+                {"mode": "live", "notice": None, "language": lang, "cached": True},
+            )
+            return
         if needs_multi_step(question, profile):
             metrics.inc("agent_routes_total")
             try:
@@ -101,12 +122,14 @@ async def stream_answer(
             )
         yield _sse("sources", [_source_dict(doc) for doc in docs])
         chain = build_answer_chain(lang)
+        usage = TokenUsageHandler()
         async for chunk in chain.astream(
             {
                 "context": docs,
                 "input": question,
                 "profile_context": profile_context,
-            }
+            },
+            config={"callbacks": [usage]},
         ):
             text = chunk if isinstance(chunk, str) else str(chunk)
             if not text:
@@ -117,7 +140,21 @@ async def stream_answer(
         verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
+        usage.record(settings.groq_model)
         metrics.inc("queries_live")
+        await anyio.to_thread.run_sync(
+            semantic_cache.store,
+            question,
+            lang,
+            ph,
+            {
+                "answer": "".join(answer_parts),
+                "sources": [_source_dict(doc) for doc in docs],
+                "quotes": [q.__dict__ for q in verified] if verified else [],
+                "mode": "live",
+                "language": lang,
+            },
+        )
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:
         if tokens_sent:

@@ -13,6 +13,18 @@ from typing import Any
 _lock = threading.Lock()
 _counters: dict[str, int] = {}
 _latencies: deque = deque(maxlen=500)
+_token_usage: dict[str, dict[str, int]] = {}
+
+
+def observe_tokens(model: str, prompt: int, completion: int) -> None:
+    """Accumulate LLM token usage per model (from response usage metadata)."""
+    with _lock:
+        bucket = _token_usage.setdefault(
+            model, {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}
+        )
+        bucket["prompt_tokens"] += prompt
+        bucket["completion_tokens"] += completion
+        bucket["calls"] += 1
 
 
 def inc(name: str, delta: int = 1) -> None:
@@ -37,7 +49,7 @@ def snapshot() -> dict[str, Any]:
         counters = dict(_counters)
         values = sorted(_latencies)
     mean = round(sum(values) / len(values), 3) if values else None
-    return {
+    snapshot_out: dict[str, Any] = {
         "counters": counters,
         "latency_ms": {
             "count": len(values),
@@ -46,3 +58,16 @@ def snapshot() -> dict[str, Any]:
             "p95": _percentile(values, 0.95),
         },
     }
+    hits = counters.get("cache_hit", 0)
+    misses = counters.get("cache_miss", 0)
+    lookups = hits + misses
+    snapshot_out["cache"] = {
+        "hit_rate": round(hits / lookups, 4) if lookups else None,
+        "hits": hits,
+        "misses": misses,
+    }
+    with _lock:
+        snapshot_out["tokens"] = {
+            model: dict(bucket) for model, bucket in _token_usage.items()
+        }
+    return snapshot_out

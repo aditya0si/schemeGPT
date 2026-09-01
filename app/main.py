@@ -11,6 +11,7 @@ from app import catalog, ingest, profiles, recommend
 from app.config import settings
 from app.db import COLLECTION_NAME, get_engine
 from app.rag import answer
+from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
 from app.schemas import (
     ProfileCreateResponse,
@@ -82,6 +83,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.get("/health")
