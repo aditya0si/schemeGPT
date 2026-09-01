@@ -21,6 +21,7 @@ from pathlib import Path
 
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
@@ -42,8 +43,10 @@ PRICE_PER_MTOK = {
 }
 
 
-class TokenUsageHandler:
+class TokenUsageHandler(BaseCallbackHandler):
     """LangChain callback that accumulates per-request LLM token usage."""
+
+    raise_error = False
 
     def __init__(self) -> None:
         self.prompt_tokens = 0

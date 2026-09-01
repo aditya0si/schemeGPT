@@ -11,3 +11,4 @@ data/.cache/
 eval/results/*.json
 eval/results/*.csv
 eval/results/history.jsonl
+data/feedback.jsonl

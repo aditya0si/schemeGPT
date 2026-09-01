@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from app import catalog, ingest, profiles, recommend
+from app import feedback as feedback_store
 from app.config import settings
 from app.db import COLLECTION_NAME, get_engine
 from app.rag import answer
@@ -15,6 +16,8 @@ from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
 from app.tracing import setup_tracing
 from app.schemas import (
+    FeedbackRequest,
+    FeedbackResponse,
     ProfileCreateResponse,
     ProfileData,
     ProfileResponse,
@@ -222,6 +225,23 @@ def query(req: QueryRequest):
             profile=req.profile,
         )
     )
+
+
+@app.post("/feedback", response_model=FeedbackResponse)
+def feedback(req: FeedbackRequest):
+    """Record a thumbs-up/down rating on one answer.
+
+    Ratings feed the offline eval set (curated thumbs-up cases grow the
+    regression suite). No profile data or identifiers are accepted here.
+    """
+    stored = feedback_store.record_feedback(
+        question=req.question,
+        answer=req.answer,
+        rating=req.rating,
+        language=req.language,
+        comment=req.comment,
+    )
+    return FeedbackResponse(stored=stored)
 
 
 @app.post("/query/stream")

@@ -138,3 +138,23 @@ class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationItem]
     disclaimer: str
     profile_state: str | None = None
+
+
+class FeedbackRequest(BaseModel):
+    """A citizen's thumbs-up/down verdict on one answer.
+
+    Only the question/answer text and the verdict are stored; profile data and
+    any identifiers are deliberately not part of the payload. The stored
+    records feed the offline eval set (curated thumbs-up cases), closing the
+    loop between live usage and evaluation.
+    """
+
+    question: str = Field(min_length=2, max_length=2000)
+    answer: str = Field(min_length=1, max_length=8000)
+    rating: Literal["up", "down"]
+    language: Literal["en", "hi"] = "en"
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class FeedbackResponse(BaseModel):
+    stored: bool

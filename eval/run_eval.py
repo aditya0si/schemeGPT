@@ -301,6 +301,8 @@ def _build_cases(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "sources": row.get("sources", []),
                 "faithfulness": metrics.get("faithfulness"),
                 "answer_relevancy": metrics.get("answer_relevancy"),
+                "context_precision": metrics.get("context_precision"),
+                "context_recall": metrics.get("context_recall"),
                 "error": row.get("error"),
             }
         )
@@ -398,12 +400,16 @@ def _write_report(
         lines.append("")
     lines.append("## Per-Question Scores")
     lines.append("")
-    lines.append("| # | Question | faithfulness | answer_relevancy | Status |")
-    lines.append("| --- | --- | --- | --- | --- |")
+    lines.append(
+        "| # | Question | faithfulness | answer_relevancy | context_precision "
+        "| context_recall | Status |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for index, case in enumerate(cases, start=1):
         lines.append(
             f"| {index} | {_md_escape(case['question'])} | "
             f"{_fmt(case['faithfulness'])} | {_fmt(case['answer_relevancy'])} | "
+            f"{_fmt(case['context_precision'])} | {_fmt(case['context_recall'])} | "
             f"{_status(case)} |"
         )
     lines.append("")

@@ -24,6 +24,7 @@ type Msg = {
   mode?: "live" | "demo";
   notice?: string | null;
   error?: string;
+  feedback?: "up" | "down" | "sent";
 };
 
 const PLACEHOLDER: Record<"en" | "hi", string> = {
@@ -133,6 +134,33 @@ export function Chat() {
     }
   }
 
+  async function sendFeedback(i: number, rating: "up" | "down") {
+    const assistant = messages[i];
+    const question = messages[i - 1]?.text ?? "";
+    patchIndex(i, (a) => ({ ...a, feedback: "sent" }));
+    try {
+      await fetch("/api/chat/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question,
+          answer: assistant.text,
+          rating,
+          language: lang,
+        }),
+      });
+    } catch {
+      // Feedback is best-effort; never disturb the conversation.
+    }
+  }
+
+  const patchIndex = (index: number, fn: (a: Msg) => Msg) =>
+    setMessages((m) => {
+      const copy = [...m];
+      copy[index] = fn(copy[index]);
+      return copy;
+    });
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16">
       <ul className="space-y-8">
@@ -229,6 +257,32 @@ export function Chat() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              ) : null}
+              {m.mode && !m.streaming && m.text ? (
+                <div className="mt-2 font-mono text-[11px] uppercase text-ink/50">
+                  {m.feedback === "sent" ? (
+                    <span>Feedback[recorded] — thank you</span>
+                  ) : (
+                    <span className="space-x-3">
+                      <button
+                        type="button"
+                        className="hover:text-verified"
+                        onClick={() => sendFeedback(i, "up")}
+                        aria-label="Helpful"
+                      >
+                        ▲ helpful
+                      </button>
+                      <button
+                        type="button"
+                        className="hover:text-signal"
+                        onClick={() => sendFeedback(i, "down")}
+                        aria-label="Not helpful"
+                      >
+                        ▼ not helpful
+                      </button>
+                    </span>
+                  )}
                 </div>
               ) : null}
             </li>
