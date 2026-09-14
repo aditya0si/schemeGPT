@@ -1,3 +1,5 @@
 pytest==9.1.1
 httpx==0.28.1
 pip-audit==2.10.1
+# Security floor: patches the runner-bundled setuptools 78.1.0 that pip-audit otherwise flags (PYSEC-2025-49, PYSEC-2026-3447).
+setuptools>=83.0.0
