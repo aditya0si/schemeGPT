@@ -4,11 +4,13 @@ from unittest.mock import patch
 
 from langchain_core.documents import Document
 
-from app.retrieval import HybridRetriever, rrf_fuse
+from app.retrieval import HybridRetriever, _select_diverse, rrf_fuse
 
 
 def _doc(text: str) -> Document:
-    return Document(page_content=text, metadata={"source": "schemes/x.md"})
+    # Distinct source per distinct content so the new source-diversity
+    # selection is exercised meaningfully by the hybrid tests.
+    return Document(page_content=text, metadata={"source": f"schemes/{text}.md"})
 
 
 def test_rrf_prefers_doc_ranked_high_in_both_lists():
@@ -37,6 +39,34 @@ def test_rrf_dedupes_identical_docs_across_channels():
     doc_b = _doc("same content")  # identical text -> same content hash
     ranked = rrf_fuse([(doc_a, 0.9)], [(doc_b, 8.0)])
     assert len(ranked) == 1
+
+
+def test_rrf_fuses_three_channels_and_boosts_consensus():
+    a, b, c, d = _doc("a"), _doc("b"), _doc("c"), _doc("d")
+    ranked = rrf_fuse(
+        [(a, 1.0), (b, 0.9)],
+        [(a, 1.0), (c, 0.9)],
+        [(a, 1.0), (d, 0.9)],
+    )
+    # ``a`` is ranked first by every channel, so fusion must put it on top.
+    assert ranked[0] is a
+    assert len(ranked) == 4
+
+
+def test_final_selection_dedupes_sources_but_preserves_order():
+    first_a = Document(page_content="a-one", metadata={"source": "schemes/a.md"})
+    second_a = Document(page_content="a-two", metadata={"source": "schemes/a.md"})
+    b = Document(page_content="b-one", metadata={"source": "schemes/b.md"})
+    c = Document(page_content="c-one", metadata={"source": "schemes/c.md"})
+    selected = _select_diverse([first_a, second_a, b, c], final_k=3)
+    assert [doc.page_content for doc in selected] == ["a-one", "b-one", "c-one"]
+
+
+def test_final_selection_keeps_unlabelled_docs_distinct():
+    first = Document(page_content="one", metadata={})
+    second = Document(page_content="two", metadata={})
+    selected = _select_diverse([first, second], final_k=2)
+    assert [doc.page_content for doc in selected] == ["one", "two"]
 
 
 def _fake_vectorstore(hits, seen=None):
