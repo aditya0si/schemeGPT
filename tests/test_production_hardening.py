@@ -29,9 +29,7 @@ def test_profile_hash_is_order_insensitive_and_distinct():
 
 
 def test_lookup_disabled_returns_none(monkeypatch):
-    monkeypatch.setattr(
-        type(semantic_cache.settings), "enable_semantic_cache", False, raising=False
-    )
+    monkeypatch.setattr(semantic_cache.settings, "enable_semantic_cache", False)
     assert semantic_cache.lookup("q", "en", "none") is None
 
 
@@ -56,6 +54,60 @@ def test_store_swallows_engine_errors(monkeypatch):
     semantic_cache.store("q", "en", "none", {"answer": "x"})
     with metrics._lock:
         assert metrics._counters.get("cache_error", 0) >= 1
+
+
+def test_cache_namespace_changes_with_model_and_corpus_generation(monkeypatch):
+    monkeypatch.setattr(semantic_cache.settings, "embedding_model", "model-a")
+    monkeypatch.setattr(semantic_cache, "stored_corpus_generation", lambda: "gen-a")
+    first = semantic_cache.cache_namespace()
+
+    monkeypatch.setattr(semantic_cache, "stored_corpus_generation", lambda: "gen-b")
+    assert semantic_cache.cache_namespace() != first
+    monkeypatch.setattr(semantic_cache.settings, "embedding_model", "model-b")
+    assert semantic_cache.cache_namespace() != first
+
+
+def test_cache_namespace_changes_with_answer_model_and_prompt_version(monkeypatch):
+    import app.rag as rag
+
+    monkeypatch.setattr(semantic_cache, "stored_corpus_generation", lambda: "gen")
+    monkeypatch.setattr(semantic_cache.settings, "groq_model", "answer-a")
+    monkeypatch.setattr(rag, "PROMPT_VERSION", "prompt-a")
+    first = semantic_cache.cache_namespace()
+
+    monkeypatch.setattr(semantic_cache.settings, "groq_model", "answer-b")
+    assert semantic_cache.cache_namespace() != first
+
+    monkeypatch.setattr(semantic_cache.settings, "groq_model", "answer-a")
+    monkeypatch.setattr(rag, "PROMPT_VERSION", "prompt-b")
+    assert semantic_cache.cache_namespace() != first
+
+
+def test_cached_quotes_are_reverified_instead_of_trusting_stored_flags():
+    payload = {
+        "answer": "> Fabricated policy text. [schemes/a.md, sample_verified]",
+        "sources": [
+            {
+                "source": "schemes/a.md",
+                "data_status": "sample_verified",
+                "content": "Real policy text.",
+            }
+        ],
+        "quotes": [
+            {
+                "text": "Fabricated policy text.",
+                "source": "schemes/a.md",
+                "status": "sample_verified",
+                "verified": True,
+                "matched_source": "schemes/a.md",
+            }
+        ],
+    }
+
+    validated = semantic_cache.revalidate_payload(payload)
+
+    assert validated["quotes"][0]["verified"] is False
+    assert validated["quotes"][0]["matched_source"] is None
 
 
 def test_metrics_snapshot_reports_cache_fields():

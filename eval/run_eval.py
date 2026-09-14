@@ -1,4 +1,4 @@
-"""Iteration 2: RAGAS evaluation harness for SchemeGPT.
+"""Live generation and provider-neutral LLM-judge harness for SchemeGPT.
 
 Run from the project root:
 
@@ -17,9 +17,9 @@ Generates:
 
 A failure case is any case whose ``faithfulness`` or ``answer_relevancy``
 score is below FAILURE_THRESHOLD (0.70), or a case where the RAG pipeline or
-a RAGAS metric raised an error. If ``app.rag.answer`` falls back to demo mode
+the model judge raised an error. If ``app.rag.answer`` falls back to demo mode
 (missing/invalid/rate-limited Groq call), the case is recorded as a pipeline
-error: it is never passed to RAGAS and never given faithfulness or
+error: it is never passed to the judge and never given faithfulness or
 answer-relevancy scores, and it stays visible under Failure Cases. The
 threshold is a project triage threshold, not a universal quality claim.
 
@@ -33,8 +33,6 @@ import argparse
 import json
 import logging
 import math
-import os
-import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -56,7 +54,7 @@ FAILURE_THRESHOLD = 0.70
 # Free-tier pacing: the answer pipeline (normalize + retrieval + answer) is
 # ~2-6k tokens per case against a shared 8k tokens/minute quota (agent-routed
 # cases burst). A 40 s gap keeps the sustained rate comfortably under it;
-# the judge phase runs 2 workers with retries.
+# the judge phase uses one bounded request per successful case.
 INTER_CASE_SLEEP_SECONDS = 40.0
 RATE_LIMIT_BACKOFF_SECONDS = 65.0
 
@@ -70,7 +68,7 @@ GATE_METRICS = tuple(GATE_FLOORS)
 
 # Error recorded when app.rag.answer fell back to demo mode (a missing, invalid
 # or rate-limited Groq call returned a pre-made demo answer). Demo answers are
-# never scored by RAGAS and are reported as failure cases. The message is
+# never scored by the judge and are reported as failure cases. The message is
 # deliberately safe and actionable; it never contains provider error details
 # or secrets.
 DEMO_FALLBACK_ERROR = (
@@ -78,21 +76,33 @@ DEMO_FALLBACK_ERROR = (
     "before evaluating"
 )
 
-# RAGAS 0.2.x metric names. `faithfulness` and `answer_relevancy` are the
-# 0.2.15 names for the answer-quality metrics; `context_precision` and
-# `context_recall` score the retrieved-context quality against the reference.
-# Newer-only aliases are deliberately not used. Only answer-quality metrics
-# are gated; context metrics are reported for diagnosis.
+# The explicit judge returns four bounded metrics. Only answer-quality metrics
+# are gated; context metrics are reported for retrieval diagnosis.
 METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
 
 
-def check_gate(aggregates: dict) -> list[str]:
-    """Return a list of gate-floor failures for the given aggregate scores.
+def check_gate(
+    aggregates: dict,
+    *,
+    scored_count: int | None = None,
+    expected_count: int | None = None,
+    error_count: int = 0,
+) -> list[str]:
+    """Return aggregate, completeness, and infrastructure gate failures.
 
-    Pure and importable without RAGAS. A floor fails if the metric is missing
-    (None) or below its floor. Empty list means the gate passes.
+    Aggregate means exclude missing values for diagnosis, but the regression
+    gate must never pass on a successful subset. When counts are supplied,
+    every expected case must have a complete score row and zero errors.
     """
     failures: list[str] = []
+    if expected_count is not None:
+        actual = 0 if scored_count is None else scored_count
+        if actual != expected_count:
+            failures.append(
+                f"coverage: {actual}/{expected_count} cases completely scored"
+            )
+    if error_count:
+        failures.append(f"errors: {error_count} case(s) failed pipeline or evaluation")
     for name, floor in GATE_FLOORS.items():
         value = aggregates.get(name)
         if value is None:
@@ -101,36 +111,8 @@ def check_gate(aggregates: dict) -> list[str]:
             failures.append(f"{name}: {value:.3f} < {floor:.2f}")
     return failures
 
-# Parses the executor error records that RAGAS 0.2.x logs when a metric fails,
-# e.g. `Exception raised in Job[3]: AuthenticationError(invalid api key)`.
-_JOB_ERROR_RE = re.compile(r"Exception raised in Job\[(\d+)\]:\s*(.*)")
-
-
 class EvalError(RuntimeError):
     """Expected, user-actionable setup/input error (shown without traceback)."""
-
-
-class _ErrorCollector(logging.Handler):
-    """Collects RAGAS executor error records and maps them back to rows."""
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.ERROR)
-        self._messages: list[tuple[int, str]] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        # Depends on the RAGAS 0.2.15 executor log format ("Exception raised in
-        # Job[N]: ..."); pinned-version internal behavior, not a public API.
-        match = _JOB_ERROR_RE.search(record.getMessage())
-        if match:
-            self._messages.append((int(match.group(1)), match.group(2).strip()))
-
-    def row_errors(self, num_metrics: int, row_index: int) -> list[str]:
-        # Jobs are submitted row-major: counter = num_metrics * row + metric_idx.
-        return [
-            message
-            for counter, message in self._messages
-            if counter // num_metrics == row_index
-        ]
 
 
 def _ensure_project_on_path() -> None:
@@ -175,7 +157,7 @@ def _run_pipeline(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     A response in demo fallback mode (``mode == "demo"``: a missing, invalid
     or rate-limited Groq call fell back to a pre-made answer) is treated as a
     pipeline/evaluation error. The demo answer is not a live RAG result and is
-    never scored by RAGAS: the row keeps its error marker so ``run()``
+    never scored by the judge: the row keeps its error marker so ``run()``
     excludes it from the scored dataset while it stays visible under Failure
     Cases in the report.
     """
@@ -238,77 +220,74 @@ def _clean_score(value: Any) -> float | None:
     return None if math.isnan(score) else score
 
 
-def _score_rows(rows: list[dict[str, Any]]) -> None:
-    """Run RAGAS 0.2.15 synchronously with the app's Groq LLM + local embeddings."""
-    from datasets import Dataset as HFDataset
-    from ragas import evaluate
-    from ragas.metrics import (
-        answer_relevancy,
-        context_precision,
-        context_recall,
-        faithfulness,
-    )
+def _parse_judge_scores(raw: str) -> dict[str, float]:
+    """Parse and validate one model-judge JSON response."""
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("judge response did not contain a JSON object")
+    try:
+        payload = json.loads(raw[start : end + 1])
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"judge response was not valid JSON: {exc}") from exc
 
-    from app.db import get_embeddings
+    missing = [name for name in METRICS if name not in payload]
+    if missing:
+        raise ValueError("judge response missing metrics: " + ", ".join(missing))
+
+    scores: dict[str, float] = {}
+    for name in METRICS:
+        score = _clean_score(payload[name])
+        if score is None:
+            raise ValueError(f"judge metric {name} was not numeric")
+        if not 0.0 <= score <= 1.0:
+            raise ValueError(f"judge metric {name} must be between 0 and 1")
+        scores[name] = score
+    return scores
+
+
+def _score_rows(rows: list[dict[str, Any]]) -> None:
+    """Score live answers with one explicit, provider-neutral LLM judge call."""
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
     from app.rag import get_llm
 
-    # RAGAS 0.2.x v2 dataset columns: question / answer / contexts / ground_truth.
-    hf_dataset = HFDataset.from_list(
+    prompt = ChatPromptTemplate.from_messages(
         [
-            {
-                "question": row["question"],
-                "answer": row["answer"],
-                "contexts": row["contexts"],
-                "ground_truth": row["reference"],
-            }
-            for row in rows
+            (
+                "system",
+                "You are a strict RAG evaluator. Score each metric from 0 to 1. "
+                "faithfulness measures whether the answer is supported by context; "
+                "answer_relevancy measures whether it answers the question; "
+                "context_precision measures whether retrieved context is relevant; "
+                "context_recall measures whether context covers the reference answer. "
+                "Return only a JSON object with exactly these numeric keys: "
+                "faithfulness, answer_relevancy, context_precision, context_recall.",
+            ),
+            (
+                "human",
+                "Question:\n{question}\n\nReference answer:\n{reference}\n\n"
+                "Retrieved context:\n{contexts}\n\nCandidate answer:\n{answer}",
+            ),
         ]
     )
+    chain = prompt | get_llm("judge") | StrOutputParser()
 
-    collector = _ErrorCollector()
-    logging.getLogger("ragas.executor").addHandler(collector)
-    try:
-        from ragas.run_config import RunConfig
-
-        result = evaluate(
-            dataset=hf_dataset,
-            metrics=[
-                faithfulness,
-                answer_relevancy,
-                context_precision,
-                context_recall,
-            ],
-            llm=get_llm("judge"),
-            embeddings=get_embeddings(),
-            raise_exceptions=False,
-            show_progress=True,
-            # The Groq free tier is rate-limited (requests AND tokens per
-            # minute, shared with the answer pipeline): a small worker pool
-            # with retries avoids the judge calls timing out en masse.
-            run_config=RunConfig(timeout=180, max_workers=2, max_retries=3, max_wait=60),
-        )
-    finally:
-        logging.getLogger("ragas.executor").removeHandler(collector)
-
-    num_metrics = len(METRICS)
-    for index, row in enumerate(rows):
-        if index >= len(result.scores):
-            # Guard before indexing: RAGAS may return fewer score rows than
-            # input rows. Keep report rows aligned by recording explicit None
-            # metrics plus an explanatory error instead of silently skipping.
+    for row in rows:
+        try:
+            raw = chain.invoke(
+                {
+                    "question": row["question"],
+                    "reference": row["reference"],
+                    "contexts": "\n\n---\n\n".join(row["contexts"]),
+                    "answer": row["answer"],
+                }
+            )
+            row["metrics"] = _parse_judge_scores(raw)
+        except Exception as exc:
             row["metrics"] = {name: None for name in METRICS}
-            row["error"] = "evaluation error: RAGAS returned no score for this row"
-            continue
-        scores = result.scores[index]
-        metrics = {name: _clean_score(scores.get(name)) for name in METRICS}
-        row["metrics"] = metrics
-        problems: list[str] = []
-        failed = [name for name in METRICS if metrics[name] is None]
-        if failed:
-            problems.append("RAGAS did not return a score for " + ", ".join(failed))
-        problems.extend(collector.row_errors(num_metrics, index))
-        if problems:
-            row["error"] = "evaluation error: " + "; ".join(problems)
+            row["error"] = f"evaluation error: {type(exc).__name__}: {exc}"
 
 
 def _build_cases(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -379,7 +358,7 @@ def _write_report(
     limit: int | None,
 ) -> None:
     lines: list[str] = []
-    lines.append("# SchemeGPT RAGAS Evaluation Report")
+    lines.append("# SchemeGPT Live Generation Evaluation Report")
     lines.append("")
     lines.append(f"- Generated: `{generated_at}` (UTC)")
     lines.append(f"- Cases evaluated: {len(cases)} of {total_count}")
@@ -487,7 +466,7 @@ def _write_report(
         "threshold, not a universal quality claim."
     )
     lines.append(
-        "- RAGAS evaluation consumes Groq free-tier quota; "
+        "- Live answers and judge calls consume Groq free-tier quota; "
         "`--limit N` provides cheap/free partial runs."
     )
     lines.append("- Per-case scores are also available in `scores.json`.")
@@ -588,7 +567,9 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
             "environment or in .env (see .env.example), then re-run."
         )
 
-    questions = _load_questions(limit)
+    all_questions = _load_questions(None)
+    questions = all_questions[:limit] if limit is not None else all_questions
+    dataset_total = len(all_questions)
     rows = _run_pipeline(questions)
 
     ok_rows = [row for row in rows if row["error"] is None]
@@ -602,13 +583,17 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
             "ingested database (docker compose up -d db). Set GROQ_API_KEY in "
             "your environment or .env, then re-run."
         )
-    # Opt out of RAGAS telemetry before ragas is imported.
-    os.environ.setdefault("RAGAS_DO_NOT_TRACK", "true")
     _score_rows(ok_rows)
 
     cases = _build_cases(rows)
     aggregate = _aggregate(cases)
     failure_cases = [case for case in cases if _is_failure(case)]
+    scored_count = sum(
+        case["error"] is None
+        and all(case[name] is not None for name in METRICS)
+        for case in cases
+    )
+    error_count = sum(case["error"] is not None for case in cases)
 
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -616,17 +601,28 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
         cases=cases,
         aggregate=aggregate,
         generated_at=generated_at,
-        total_count=len(questions),
+        total_count=dataset_total,
         limit=limit,
     )
-    _write_scores(cases, aggregate, generated_at, len(questions), limit)
+    _write_scores(cases, aggregate, generated_at, dataset_total, limit)
     _append_history(aggregate, generated_at, limit, label)
 
-    gate_failures = check_gate(aggregate) if gate else []
+    gate_failures = (
+        check_gate(
+            aggregate,
+            scored_count=scored_count,
+            expected_count=len(questions),
+            error_count=error_count,
+        )
+        if gate
+        else []
+    )
 
     return {
         "generated_at": generated_at,
-        "cases_total": len(questions),
+        "cases_total": dataset_total,
+        "cases_evaluated": len(questions),
+        "cases_scored": scored_count,
         "aggregate": aggregate,
         "failure_count": len(failure_cases),
         "gate_failures": gate_failures,
@@ -638,7 +634,7 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m eval.run_eval",
-        description="Run the RAGAS evaluation harness for SchemeGPT "
+        description="Run the live generation evaluation harness for SchemeGPT "
         "(Groq judge LLM + local HuggingFace embeddings).",
     )
     parser.add_argument(
@@ -652,8 +648,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--gate",
         action="store_true",
-        help="Fail (exit 1) if the aggregate gate floors are missed "
-        "(faithfulness >= 0.85, answer_relevancy >= 0.70).",
+        help="Fail unless every selected case is completely scored with zero "
+        "errors and aggregate floors are met (faithfulness >= 0.85, "
+        "answer_relevancy >= 0.70).",
     )
     parser.add_argument(
         "--label",
@@ -688,7 +685,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(
-        f"Evaluation complete: {summary['cases_total']} case(s), "
+        "Evaluation complete: "
+        f"{summary['cases_evaluated']}/{summary['cases_total']} selected, "
+        f"{summary['cases_scored']} completely scored, "
         f"{summary['failure_count']} failure case(s)."
     )
     if summary["gate_failures"]:

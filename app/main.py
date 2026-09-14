@@ -10,7 +10,14 @@ from sqlalchemy import text
 from app import catalog, ingest, profiles, recommend
 from app import feedback as feedback_store
 from app.config import settings
-from app.db import COLLECTION_NAME, get_engine
+from app.db import (
+    VECTOR_GENERATION_COLUMN,
+    VECTOR_TABLE,
+    get_engine,
+    stored_corpus_chunk_count,
+    stored_corpus_generation,
+    stored_embedding_model,
+)
 from app.rag import answer
 from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
@@ -31,18 +38,26 @@ from app.schemas import (
 def count_vectors() -> int:
     with get_engine().connect() as conn:
         table_exists = conn.execute(
-            text("SELECT to_regclass('public.langchain_pg_collection')")
+            text("SELECT to_regclass(:table_name)"),
+            {"table_name": f"public.{VECTOR_TABLE}"},
         ).scalar()
         if table_exists is None:
             return 0
         return int(
+            conn.execute(text(f"SELECT count(*) FROM {VECTOR_TABLE}")).scalar()
+        )
+
+
+def count_generation_vectors(generation: str) -> int:
+    """Rows belonging to one atomically activated corpus generation."""
+    with get_engine().connect() as conn:
+        return int(
             conn.execute(
                 text(
-                    "SELECT count(*) FROM langchain_pg_embedding e "
-                    "JOIN langchain_pg_collection c ON e.collection_id = c.uuid "
-                    "WHERE c.name = :name"
+                    f"SELECT count(*) FROM {VECTOR_TABLE} "
+                    f"WHERE {VECTOR_GENERATION_COLUMN} = :generation"
                 ),
-                {"name": COLLECTION_NAME},
+                {"generation": generation},
             ).scalar()
         )
 
@@ -54,21 +69,14 @@ async def lifespan(app: FastAPI):
     if count_vectors() == 0:
         ingest.ingest()
     else:
-        # Vectors exist: verify they were embedded by the CONFIGURED model.
-        # Vectors from a different model are silently wrong (incomparable
-        # spaces); warn loudly instead of auto-deleting anything.
-        from app.db import stored_embedding_model
-
+        # Vectors exist: readiness rejects model or generation drift rather
+        # than silently comparing embeddings from incompatible spaces.
         recorded = stored_embedding_model()
         if recorded is not None and recorded != settings.embedding_model:
             logging.getLogger(__name__).warning(
-                "Vector store was embedded with '%s' but the API is configured "
-                "for '%s'. Retrieval quality is degraded until the corpus is "
-                "re-embedded. Run: python scripts/reembed.py --yes",
-                recorded,
-                settings.embedding_model,
+                "Vector store embedding model does not match configuration. "
+                "Run: python scripts/reembed.py"
             )
-    # Full-text search index for hybrid retrieval (idempotent, non-fatal).
     from app.db import ensure_fts_index
 
     ensure_fts_index()
@@ -91,6 +99,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RateLimitMiddleware)
+
+
+@app.get("/livez", include_in_schema=False)
+def livez():
+    """Process liveness probe: intentionally performs no dependency I/O."""
+    return {"status": "alive"}
+
+
+@app.get("/readyz")
+def readyz():
+    """Dependency readiness for safe traffic routing and post-deploy checks."""
+    checks: dict[str, object] = {"database": "ok"}
+    try:
+        vectors = count_vectors()
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Readiness database check failed (%s).", type(exc).__name__
+        )
+        checks["database"] = "unavailable"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        ) from None
+
+    checks["vectors"] = vectors
+    if vectors < 1:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    recorded_model = stored_embedding_model()
+    if recorded_model != settings.embedding_model:
+        checks["embedding_model"] = "mismatch"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    checks["embedding_model"] = "ok"
+    try:
+        generation = stored_corpus_generation()
+        expected_count = stored_corpus_chunk_count()
+        generation_count = (
+            count_generation_vectors(generation) if generation else 0
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Readiness generation check failed (%s).", type(exc).__name__
+        )
+        checks["database"] = "unavailable"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        ) from None
+    if (
+        not generation
+        or expected_count != vectors
+        or generation_count != vectors
+    ):
+        checks["corpus_generation"] = "incomplete"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    checks["corpus_generation"] = "ok"
+    return {
+        "status": "ready",
+        "mode": "live" if settings.groq_api_key.strip() else "demo",
+        "checks": checks,
+    }
 
 
 @app.get("/health")

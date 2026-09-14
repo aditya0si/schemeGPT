@@ -1,43 +1,77 @@
 [
   {
     "question": "What health insurance cover does Ayushman Bharat PM-JAY provide per family per year?",
-    "reference": "Ayushman Bharat PM-JAY provides a health cover of \u20b95 lakh per family per year, on a floater basis, for secondary and tertiary hospitalisation."
+    "reference": "Ayushman Bharat PM-JAY provides a health cover of \u20b95 lakh per family per year, on a floater basis, for secondary and tertiary hospitalisation.",
+    "id": "pmjay-cover",
+    "expected_sources": [
+      "schemes/ayushman-bharat.md"
+    ]
   },
   {
     "question": "When was GST introduced in India and which indirect taxes did it subsume?",
-    "reference": "GST was introduced in India on 1 July 2017. It subsumed multiple indirect taxes such as VAT, service tax, and excise duty."
+    "reference": "GST was introduced in India on 1 July 2017. It subsumed multiple indirect taxes such as VAT, service tax, and excise duty.",
+    "id": "gst-launch",
+    "expected_sources": [
+      "schemes/gst.md"
+    ]
   },
   {
     "question": "What is the GST registration turnover threshold for goods and for services?",
-    "reference": "Businesses above the turnover threshold must register for GST: \u20b940 lakh for goods and \u20b920 lakh for services, with lower thresholds in some states."
+    "reference": "Businesses above the turnover threshold must register for GST: \u20b940 lakh for goods and \u20b920 lakh for services, with lower thresholds in some states.",
+    "id": "gst-threshold",
+    "expected_sources": [
+      "schemes/gst.md"
+    ]
   },
   {
     "question": "How much income support does PM-KISAN provide and in what instalments is it paid?",
-    "reference": "PM-KISAN provides \u20b96,000 per year to eligible landholding farmer families, paid directly into their bank accounts through Direct Benefit Transfer (DBT) in three equal instalments of \u20b92,000 each, released every four months."
+    "reference": "PM-KISAN provides \u20b96,000 per year to eligible landholding farmer families, paid directly into their bank accounts through Direct Benefit Transfer (DBT) in three equal instalments of \u20b92,000 each, released every four months.",
+    "id": "pm-kisan-payment",
+    "expected_sources": [
+      "schemes/pm-kisan.md"
+    ]
   },
   {
     "question": "Who is excluded from receiving PM-KISAN benefits?",
-    "reference": "Excluded from PM-KISAN are institutional landholders, farmer families where any member pays income tax, and families with a government employee in a higher grade."
+    "reference": "Excluded from PM-KISAN are institutional landholders, farmer families where any member pays income tax, and families with a government employee in a higher grade.",
+    "id": "pm-kisan-exclusions",
+    "expected_sources": [
+      "schemes/pm-kisan.md"
+    ]
   },
   {
     "question": "What monthly pension does PM-SYM provide and at what age does it start?",
-    "reference": "PM-SYM provides a monthly pension of \u20b93,000 after the subscriber attains the age of 60 years; the entry age is 18 to 40 years."
+    "reference": "PM-SYM provides a monthly pension of \u20b93,000 after the subscriber attains the age of 60 years; the entry age is 18 to 40 years.",
+    "id": "pm-sym-pension",
+    "expected_sources": [
+      "schemes/pm-sym.md"
+    ]
   },
   {
     "question": "How much financial assistance does PMAY-G provide for building a pucca house?",
-    "reference": "PMAY-G provides financial assistance of \u20b91.20 lakh per house in plain areas and \u20b91.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts."
+    "reference": "PMAY-G provides financial assistance of \u20b91.20 lakh per house in plain areas and \u20b91.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts.",
+    "id": "pmay-g-assistance",
+    "expected_sources": [
+      "schemes/pmay-g.md"
+    ]
   },
   {
     "question": "What are the eligibility conditions for DPIIT startup recognition under Startup India?",
-    "reference": "An entity must be incorporated as a private limited company, LLP, or registered partnership, be less than 10 years old, and have a turnover of up to \u20b9100 crore in any financial year."
+    "reference": "An entity must be incorporated as a private limited company, LLP, or registered partnership, be less than 10 years old, and have a turnover of up to \u20b9100 crore in any financial year.",
+    "id": "startup-india-eligibility",
+    "expected_sources": [
+      "schemes/startup-india.md"
+    ]
   },
   {
     "question": "What is the current exchange rate of Bitcoin to the Indian rupee?",
-    "reference": "This question is out of scope for SchemeGPT: the provided context contains no information about cryptocurrency exchange rates, so the answer should state that the information is not available."
+    "reference": "This question is out of scope for SchemeGPT: the provided context contains no information about cryptocurrency exchange rates, so the answer should state that the information is not available.",
+    "id": "case-09"
   },
   {
     "question": "Which jurisdictions does the SchemeGPT directory cover, and what does a state or union territory entry tell a citizen?",
-    "reference": "The SchemeGPT directory covers 36 jurisdictions: 28 states and 8 union territories. Each state/UT entry is a directory_seed discovery entry: it maps the jurisdiction for scheme search and links to the official national MyScheme discovery portal, but it is not a verified scheme-level eligibility decision."
+    "reference": "The SchemeGPT directory covers 36 jurisdictions: 28 states and 8 union territories. Each state/UT entry is a directory_seed discovery entry: it maps the jurisdiction for scheme search and links to the official national MyScheme discovery portal, but it is not a verified scheme-level eligibility decision.",
+    "id": "case-10"
   },
   {
     "question": "I am a 35-year-old unorganised worker earning about 12,000 rupees per month in rural Karnataka. Which central pension scheme could match my profile?",
@@ -52,44 +86,78 @@
         "social security"
       ]
     },
-    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; a 35-year-old unorganised worker earning about Rs 12,000 per month is within the documented entry age and income band. The Karnataka directory seed is a discovery entry, not a verified eligibility decision."
+    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; a 35-year-old unorganised worker earning about Rs 12,000 per month is within the documented entry age and income band. The Karnataka directory seed is a discovery entry, not a verified eligibility decision.",
+    "id": "profile-pm-sym",
+    "expected_sources": [
+      "schemes/pm-sym.md"
+    ]
   },
   {
     "question": "\u092a\u0940\u090f\u092e-\u0915\u093f\u0938\u093e\u0928 \u0915\u0947 \u0924\u0939\u0924 \u092a\u093e\u0924\u094d\u0930 \u0915\u093f\u0938\u093e\u0928 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u092a\u094d\u0930\u0924\u093f \u0935\u0930\u094d\u0937 \u0915\u093f\u0924\u0928\u0940 \u0906\u092f \u0938\u0939\u093e\u092f\u0924\u093e \u092e\u093f\u0932\u0924\u0940 \u0939\u0948 \u0914\u0930 \u092f\u0939 \u0915\u093f\u0924\u0928\u0940 \u0915\u093f\u0936\u094d\u0924\u094b\u0902 \u092e\u0947\u0902 \u0926\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948?",
     "language": "hi",
-    "reference": "\u092a\u0940\u090f\u092e-\u0915\u093f\u0938\u093e\u0928 \u0915\u0947 \u0924\u0939\u0924 \u092a\u093e\u0924\u094d\u0930 \u092d\u0942\u092e\u093f\u0927\u093e\u0930\u0940 \u0915\u093f\u0938\u093e\u0928 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u092a\u094d\u0930\u0924\u093f \u0935\u0930\u094d\u0937 \u20b96,000 \u0915\u0940 \u0906\u092f \u0938\u0939\u093e\u092f\u0924\u093e \u092e\u093f\u0932\u0924\u0940 \u0939\u0948, \u091c\u094b \u0921\u0940\u092c\u0940\u091f\u0940 \u0926\u094d\u0935\u093e\u0930\u093e \u0938\u0940\u0927\u0947 \u0909\u0928\u0915\u0947 \u092c\u0948\u0902\u0915 \u0916\u093e\u0924\u0947 \u092e\u0947\u0902 \u20b92,000 \u0915\u0940 \u0924\u0940\u0928 \u0938\u092e\u093e\u0928 \u0915\u093f\u0936\u094d\u0924\u094b\u0902 \u092e\u0947\u0902 \u0926\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948, \u0914\u0930 \u0939\u0930 \u091a\u093e\u0930 \u092e\u0939\u0940\u0928\u0947 \u092e\u0947\u0902 \u090f\u0915 \u0915\u093f\u0936\u094d\u0924 \u091c\u093e\u0930\u0940 \u0915\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948\u0964"
+    "reference": "\u092a\u0940\u090f\u092e-\u0915\u093f\u0938\u093e\u0928 \u0915\u0947 \u0924\u0939\u0924 \u092a\u093e\u0924\u094d\u0930 \u092d\u0942\u092e\u093f\u0927\u093e\u0930\u0940 \u0915\u093f\u0938\u093e\u0928 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u092a\u094d\u0930\u0924\u093f \u0935\u0930\u094d\u0937 \u20b96,000 \u0915\u0940 \u0906\u092f \u0938\u0939\u093e\u092f\u0924\u093e \u092e\u093f\u0932\u0924\u0940 \u0939\u0948, \u091c\u094b \u0921\u0940\u092c\u0940\u091f\u0940 \u0926\u094d\u0935\u093e\u0930\u093e \u0938\u0940\u0927\u0947 \u0909\u0928\u0915\u0947 \u092c\u0948\u0902\u0915 \u0916\u093e\u0924\u0947 \u092e\u0947\u0902 \u20b92,000 \u0915\u0940 \u0924\u0940\u0928 \u0938\u092e\u093e\u0928 \u0915\u093f\u0936\u094d\u0924\u094b\u0902 \u092e\u0947\u0902 \u0926\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948, \u0914\u0930 \u0939\u0930 \u091a\u093e\u0930 \u092e\u0939\u0940\u0928\u0947 \u092e\u0947\u0902 \u090f\u0915 \u0915\u093f\u0936\u094d\u0924 \u091c\u093e\u0930\u0940 \u0915\u0940 \u091c\u093e\u0924\u0940 \u0939\u0948\u0964",
+    "id": "pm-kisan-hindi",
+    "expected_sources": [
+      "schemes/pm-kisan.md"
+    ]
   },
   {
     "question": "pm kisan ka paisa kab aata hai",
-    "reference": "PM-KISAN income support of Rs 6,000 per year is released in three equal instalments of Rs 2,000 each, every four months, by Direct Benefit Transfer (DBT)."
+    "reference": "PM-KISAN income support of Rs 6,000 per year is released in three equal instalments of Rs 2,000 each, every four months, by Direct Benefit Transfer (DBT).",
+    "id": "pm-kisan-hinglish-payment",
+    "expected_sources": [
+      "schemes/pm-kisan.md"
+    ]
   },
   {
     "question": "kisan ko sarkar har saal kitne rupaye deti hai",
-    "reference": "PM-KISAN provides income support of Rs 6,000 per year to eligible landholding farmer families in India, paid directly into their bank accounts through Direct Benefit Transfer (DBT)."
+    "reference": "PM-KISAN provides income support of Rs 6,000 per year to eligible landholding farmer families in India, paid directly into their bank accounts through Direct Benefit Transfer (DBT).",
+    "id": "pm-kisan-colloquial",
+    "expected_sources": [
+      "schemes/pm-kisan.md"
+    ]
   },
   {
     "question": "mera pension banao kaun sa scheme chune",
-    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; it provides a monthly pension of Rs 3,000 after the subscriber attains the age of 60 years."
+    "reference": "PM-SYM (Pradhan Mantri Shram Yogi Maandhan) is a pension scheme for unorganised workers with monthly income up to Rs 15,000 and an entry age of 18 to 40 years; it provides a monthly pension of Rs 3,000 after the subscriber attains the age of 60 years.",
+    "id": "pm-sym-hinglish",
+    "expected_sources": [
+      "schemes/pm-sym.md"
+    ]
   },
   {
     "question": "\u092a\u0940\u090f\u092e-\u0936\u094d\u0930\u092e \u092f\u094b\u0917\u0940 \u092e\u093e\u0928\u0927\u0928 \u092f\u094b\u091c\u0928\u093e \u0915\u093f\u0924\u0928\u0940 \u092a\u0947\u0902\u0936\u0928 \u0926\u0947\u0924\u0940 \u0939\u0948 \u0914\u0930 \u0915\u093f\u0938 \u0909\u092e\u094d\u0930 \u092e\u0947\u0902 \u0936\u0941\u0930\u0942 \u0939\u094b\u0924\u0940 \u0939\u0948?",
     "language": "hi",
-    "reference": "\u092a\u0940\u090f\u092e-\u0936\u094d\u0930\u092e \u092f\u094b\u0917\u0940 \u092e\u093e\u0928\u0927\u0928 (\u092a\u0940\u090f\u092e-\u090f\u0938\u0935\u093e\u0908\u090f\u092e) \u0905\u0938\u0902\u0917\u0920\u093f\u0924 \u0915\u094d\u0937\u0947\u0924\u094d\u0930 \u0915\u0947 \u0936\u094d\u0930\u092e\u093f\u0915\u094b\u0902 \u0915\u0947 \u0932\u093f\u090f \u092a\u0947\u0902\u0936\u0928 \u092f\u094b\u091c\u0928\u093e \u0939\u0948, \u091c\u094b \u0905\u092d\u093f\u0926\u093e\u0924\u093e \u0915\u0947 60 \u0935\u0930\u094d\u0937 \u0915\u0940 \u0906\u092f\u0941 \u092a\u0942\u0930\u0940 \u0915\u0930\u0928\u0947 \u092a\u0930 \u20b93,000 \u092e\u093e\u0938\u093f\u0915 \u092a\u0947\u0902\u0936\u0928 \u0926\u0947\u0924\u0940 \u0939\u0948; \u092a\u094d\u0930\u0935\u0947\u0936 \u0906\u092f\u0941 18 \u0938\u0947 40 \u0935\u0930\u094d\u0937 \u0939\u0948\u0964"
+    "reference": "\u092a\u0940\u090f\u092e-\u0936\u094d\u0930\u092e \u092f\u094b\u0917\u0940 \u092e\u093e\u0928\u0927\u0928 (\u092a\u0940\u090f\u092e-\u090f\u0938\u0935\u093e\u0908\u090f\u092e) \u0905\u0938\u0902\u0917\u0920\u093f\u0924 \u0915\u094d\u0937\u0947\u0924\u094d\u0930 \u0915\u0947 \u0936\u094d\u0930\u092e\u093f\u0915\u094b\u0902 \u0915\u0947 \u0932\u093f\u090f \u092a\u0947\u0902\u0936\u0928 \u092f\u094b\u091c\u0928\u093e \u0939\u0948, \u091c\u094b \u0905\u092d\u093f\u0926\u093e\u0924\u093e \u0915\u0947 60 \u0935\u0930\u094d\u0937 \u0915\u0940 \u0906\u092f\u0941 \u092a\u0942\u0930\u0940 \u0915\u0930\u0928\u0947 \u092a\u0930 \u20b93,000 \u092e\u093e\u0938\u093f\u0915 \u092a\u0947\u0902\u0936\u0928 \u0926\u0947\u0924\u0940 \u0939\u0948; \u092a\u094d\u0930\u0935\u0947\u0936 \u0906\u092f\u0941 18 \u0938\u0947 40 \u0935\u0930\u094d\u0937 \u0939\u0948\u0964",
+    "id": "pm-sym-hindi",
+    "expected_sources": [
+      "schemes/pm-sym.md"
+    ]
   },
   {
     "question": "Compare PM-KISAN and PM-SYM for a 40-year-old landless farm labourer.",
-    "reference": "PM-KISAN provides income support to landholding farmer families (Rs 6,000 per year via DBT), so a landless labourer does not qualify for it; PM-SYM covers unorganised workers aged 18-40 with income up to Rs 15,000 and pays Rs 3,000 per month from age 60, so a 40-year-old landless farm labourer fits PM-SYM."
+    "reference": "PM-KISAN provides income support to landholding farmer families (Rs 6,000 per year via DBT), so a landless labourer does not qualify for it; PM-SYM covers unorganised workers aged 18-40 with income up to Rs 15,000 and pays Rs 3,000 per month from age 60, so a 40-year-old landless farm labourer fits PM-SYM.",
+    "id": "case-17"
   },
   {
     "question": "A 55-year-old wants a scheme; should they consider PM-KISAN or PM-SYM?",
-    "reference": "PM-SYM has an entry age of 18 to 40 years, so a 55-year-old cannot newly join PM-SYM; PM-KISAN is for landholding farmer families and has no stated upper age limit, so a landholding farmer of 55 could consider PM-KISAN."
+    "reference": "PM-SYM has an entry age of 18 to 40 years, so a 55-year-old cannot newly join PM-SYM; PM-KISAN is for landholding farmer families and has no stated upper age limit, so a landholding farmer of 55 could consider PM-KISAN.",
+    "id": "case-18"
   },
   {
     "question": "What does the scheme document say verbatim about PMAY-G assistance amounts?",
-    "reference": "PMAY-G provides financial assistance of Rs 1.20 lakh per house in plain areas and Rs 1.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts."
+    "reference": "PMAY-G provides financial assistance of Rs 1.20 lakh per house in plain areas and Rs 1.30 lakh in hilly areas, difficult areas, and Integrated Action Plan (IAP) districts.",
+    "id": "pmay-g-verbatim",
+    "expected_sources": [
+      "schemes/pmay-g.md"
+    ]
   },
   {
     "question": "Which scheme directory entry covers Sikkim and what does it link to?",
-    "reference": "The Sikkim entry is a directory_seed discovery record (data_status: directory_seed) that confirms scheme-search coverage for the jurisdiction and links citizens to the official national MyScheme discovery portal (https://www.myscheme.gov.in/); it makes no scheme-level eligibility claims."
+    "reference": "The Sikkim entry is a directory_seed discovery record (data_status: directory_seed) that confirms scheme-search coverage for the jurisdiction and links citizens to the official national MyScheme discovery portal (https://www.myscheme.gov.in/); it makes no scheme-level eligibility claims.",
+    "id": "sikkim-directory",
+    "expected_sources": [
+      "states/sikkim.md"
+    ]
   }
 ]

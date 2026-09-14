@@ -4,11 +4,13 @@ from unittest.mock import patch
 
 from langchain_core.documents import Document
 
-from app.retrieval import HybridRetriever, rrf_fuse
+from app.retrieval import HybridRetriever, _select_diverse, rrf_fuse
 
 
 def _doc(text: str) -> Document:
-    return Document(page_content=text, metadata={"source": "schemes/x.md"})
+    # Distinct source per distinct content so the new source-diversity
+    # selection is exercised meaningfully by the hybrid tests.
+    return Document(page_content=text, metadata={"source": f"schemes/{text}.md"})
 
 
 def test_rrf_prefers_doc_ranked_high_in_both_lists():
@@ -39,9 +41,39 @@ def test_rrf_dedupes_identical_docs_across_channels():
     assert len(ranked) == 1
 
 
-def _fake_vectorstore(hits):
+def test_rrf_fuses_three_channels_and_boosts_consensus():
+    a, b, c, d = _doc("a"), _doc("b"), _doc("c"), _doc("d")
+    ranked = rrf_fuse(
+        [(a, 1.0), (b, 0.9)],
+        [(a, 1.0), (c, 0.9)],
+        [(a, 1.0), (d, 0.9)],
+    )
+    # ``a`` is ranked first by every channel, so fusion must put it on top.
+    assert ranked[0] is a
+    assert len(ranked) == 4
+
+
+def test_final_selection_dedupes_sources_but_preserves_order():
+    first_a = Document(page_content="a-one", metadata={"source": "schemes/a.md"})
+    second_a = Document(page_content="a-two", metadata={"source": "schemes/a.md"})
+    b = Document(page_content="b-one", metadata={"source": "schemes/b.md"})
+    c = Document(page_content="c-one", metadata={"source": "schemes/c.md"})
+    selected = _select_diverse([first_a, second_a, b, c], final_k=3)
+    assert [doc.page_content for doc in selected] == ["a-one", "b-one", "c-one"]
+
+
+def test_final_selection_keeps_unlabelled_docs_distinct():
+    first = Document(page_content="one", metadata={})
+    second = Document(page_content="two", metadata={})
+    selected = _select_diverse([first, second], final_k=2)
+    assert [doc.page_content for doc in selected] == ["one", "two"]
+
+
+def _fake_vectorstore(hits, seen=None):
     class FakeStore:
-        def similarity_search_with_score(self, query, k):
+        def similarity_search_with_score(self, query, k, filter=None):
+            if seen is not None:
+                seen.append(filter)
             return hits[:k]
 
     return FakeStore()
@@ -96,3 +128,39 @@ def test_hybrid_retriever_returns_fused_top_k():
     # the 3 unique docs; d3 is present via vector search alone).
     assert len(docs) == 3
     assert {d.page_content for d in docs} == {"one", "two", "three"}
+    assert all(d.metadata["data_status"] == "unknown" for d in docs)
+
+
+def test_hybrid_retriever_filters_both_channels_to_bound_generation():
+    d1 = _doc("one")
+    seen_filters = []
+    fake_engine = _fake_engine([(d1.page_content, {"source": "s"}, 1.0)])
+    with (
+        patch("app.db.get_vectorstore",
+              return_value=_fake_vectorstore([(d1, 0.9)], seen_filters)),
+        patch("app.retrieval.get_engine", return_value=fake_engine),
+        patch("app.retrieval.settings") as fake_settings,
+    ):
+        fake_settings.enable_reranker = False
+        docs = HybridRetriever(corpus_generation="gen-a").invoke("q")
+
+    assert seen_filters == [{"corpus_generation": "gen-a"}]
+    assert fake_engine.conn.fetched["generation"] == "gen-a"
+    assert docs
+
+
+def test_hybrid_retriever_without_generation_stays_unfiltered():
+    d1 = _doc("one")
+    seen_filters = []
+    fake_engine = _fake_engine([(d1.page_content, {"source": "s"}, 1.0)])
+    with (
+        patch("app.db.get_vectorstore",
+              return_value=_fake_vectorstore([(d1, 0.9)], seen_filters)),
+        patch("app.retrieval.get_engine", return_value=fake_engine),
+        patch("app.retrieval.settings") as fake_settings,
+    ):
+        fake_settings.enable_reranker = False
+        HybridRetriever().invoke("q")
+
+    assert seen_filters == [None]
+    assert "generation" not in fake_engine.conn.fetched

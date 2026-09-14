@@ -23,6 +23,22 @@ def test_plan_directories_includes_myscheme(tmp_path, monkeypatch):
     assert {p.name for p in plan} == {"schemes", "states"}
 
 
+def test_load_markdown_documents_is_sorted_and_recursive(tmp_path):
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "b.md").write_text("second", encoding="utf-8")
+    (tmp_path / "a.md").write_text("first", encoding="utf-8")
+    (tmp_path / "ignored.txt").write_text("ignored", encoding="utf-8")
+
+    docs = ingest._load_markdown_documents(tmp_path, recursive=True)
+
+    assert [doc.page_content for doc in docs] == ["first", "second"]
+    assert [doc.metadata["source"] for doc in docs] == [
+        str(tmp_path / "a.md"),
+        str(nested / "b.md"),
+    ]
+
+
 def test_chunk_metadata_tags_myscheme_imports():
     """Chunks from data/myscheme carry honest import provenance."""
     meta = ingest._chunk_metadata("myscheme/pm-kisan-like.md")

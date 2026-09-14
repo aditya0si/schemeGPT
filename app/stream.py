@@ -20,15 +20,13 @@ from typing import AsyncIterator
 import anyio
 
 from app import metrics, semantic_cache
-from app.agent import needs_multi_step, run_agent_gather
 from app.rag import (
     _build_profile_context,
     _normalize_language,
     build_answer_chain,
     demo_answer,
     get_llm,
-    get_retriever,
-    normalize_question,
+    retrieve_context,
     TokenUsageHandler,
 )
 from app.config import settings
@@ -74,15 +72,26 @@ async def stream_answer(
     tokens_sent = False
     answer_parts: list[str] = []
     try:
-        # Fail fast (no key -> ValueError) before touching the DB.
-        get_llm()
+        # Keep demo-mode requests database-free and match synchronous behavior.
+        if not settings.groq_api_key.strip():
+            raise ValueError("Groq API key is not configured")
+        # Capture the corpus generation once and carry it through lookup,
+        # retrieval, and store, matching the synchronous /query path exactly.
+        # An unknown generation fails closed (raised here, caught below) so the
+        # stream never runs an unbound retrieval or an unnamed cache namespace.
+        generation = await anyio.to_thread.run_sync(
+            semantic_cache.capture_generation
+        )
+        if not generation:
+            raise RuntimeError("corpus generation is uninitialized")
         # Semantic cache: serve a stored live answer for a semantically equal
         # question (same language + profile) with the identical event shape.
         ph = semantic_cache.profile_hash(profile)
         cached = await anyio.to_thread.run_sync(
-            semantic_cache.lookup, question, lang, ph
+            semantic_cache.lookup, question, lang, ph, generation
         )
         if cached is not None:
+            cached = semantic_cache.revalidate_payload(cached)
             yield _sse("sources", cached.get("sources", []))
             answer_text = cached.get("answer", "")
             for i in range(0, len(answer_text), 80):
@@ -95,42 +104,19 @@ async def stream_answer(
                 {"mode": "live", "notice": None, "language": lang, "cached": True},
             )
             return
-        if needs_multi_step(question, profile):
-            metrics.inc("agent_routes_total")
-            try:
-                with stage_span("agent_gather"):
-                    docs, steps = await anyio.to_thread.run_sync(
-                        run_agent_gather, question, lang, profile
-                    )
-            except Exception as exc:
-                # Agent loop failed: degrade to single-shot retrieval rather
-                # than dropping to demo mode for a live-configured stack.
-                logger.warning("Agent retrieval failed (%s); single-shot path.", type(exc).__name__)
-                with stage_span("normalize"):
-                    normalized = await anyio.to_thread.run_sync(
-                        normalize_question, question
-                    )
-                with stage_span("retrieve") as span:
-                    docs = await anyio.to_thread.run_sync(
-                        lambda: get_retriever().invoke(normalized)
-                    )
-                    if span is not None:
-                        span.set_attribute("docs.count", len(docs))
-                steps = []
-            for step in steps:
-                yield _sse("step", step)
-        else:
-            with stage_span("normalize"):
-                normalized = await anyio.to_thread.run_sync(
-                    normalize_question, question
-                )
-            with stage_span("retrieve") as span:
-                docs = await anyio.to_thread.run_sync(
-                    lambda: get_retriever().invoke(normalized)
-                )
-                if span is not None:
-                    span.set_attribute("docs.count", len(docs))
-        yield _sse("sources", [_source_dict(doc) for doc in docs])
+        # A valid cache hit avoids a provider call; a miss validates the client
+        # before retrieval and falls back cleanly if provider setup is invalid.
+        get_llm()
+        with stage_span("retrieve") as span:
+            docs, steps = await anyio.to_thread.run_sync(
+                retrieve_context, question, lang, profile, generation
+            )
+            if span is not None:
+                span.set_attribute("docs.count", len(docs))
+        for step in steps:
+            yield _sse("step", step)
+        source_payload = [_source_dict(doc) for doc in docs]
+        yield _sse("sources", source_payload)
         chain = build_answer_chain(lang)
         usage = TokenUsageHandler()
         with stage_span("generate"):
@@ -149,7 +135,7 @@ async def stream_answer(
                 answer_parts.append(text)
                 yield _sse("token", {"text": text})
         with stage_span("verify_quotes"):
-            verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
+            verified = verify_quotes(parse_quotes("".join(answer_parts)), source_payload)
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
         usage.record(settings.groq_model)
@@ -161,11 +147,12 @@ async def stream_answer(
             ph,
             {
                 "answer": "".join(answer_parts),
-                "sources": [_source_dict(doc) for doc in docs],
+                "sources": source_payload,
                 "quotes": [q.__dict__ for q in verified] if verified else [],
                 "mode": "live",
                 "language": lang,
             },
+            generation,
         )
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:

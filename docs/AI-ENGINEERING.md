@@ -18,10 +18,11 @@ FastAPI (app/main.py)  ── social: GROQ_API_KEY (free tier)
    │                     embeddings: local sentence-transformers (offline)
    ▼
 pgvector (Postgres 16, db/:5432, NOT published)
-   • langchain_pg_embedding   — 384-dim vectors (cmetadata provenance)
+   • scheme_docs_v2            — application-owned vectors + JSON provenance
    • tsv tsvector + GIN index — full-text channel (hybrid retrieval)
+   • JSON `source` slugs      — lexical scheme-name channel (hybrid retrieval)
    • profiles table           — saved citizen profiles
-eval/                       RAGAS offline harness (dev only, not in image)
+eval/                       deterministic retrieval + optional LLM judge
 scripts/                    data validation, re-embedding, dev stub API
 data/                       Markdown corpus (6 verified schemes + 36 state/UT seeds)
 ```
@@ -54,13 +55,21 @@ pre-made demo answer (HTTP 200, never a traceback, never a leaked secret).
    Hindi, or Hinglish is rewritten by the *fast* model into one clean retrieval
    query. Any failure falls back to the raw question, so retrieval always
    proceeds. The answer language always matches the question language.
-3. **Retrieval** (`app.retrieval.HybridRetriever`) — two channels fused by
+3. **Retrieval** (`app.retrieval.HybridRetriever`) — three channels fused by
    **Reciprocal Rank Fusion**:
-   - *Vector*: cosine similarity in the multilingual embedding space.
+   - *Vector*: cosine similarity in the multilingual embedding space — strong on
+     semantic paraphrases, weak on Romanized Hindi and bare scheme names.
    - *Full-text*: Postgres `tsvector` with `websearch_to_tsquery` for exact
-     keyword hits that embedding fallback can miss.
+     English keyword hits that embedding fallback can miss.
+   - *Lexical*: canonical source-slug tokens matched against salient query
+     tokens (English + Hinglish stopwords removed), anchoring explicit scheme
+     names/aliases such as `pm kisan`, `pm-sym`, `startup india`, and `dpiit`.
    - *Optional rerank*: a cross-encoder re-scores the fused shortlist
      (`ENABLE_RERANKER=1`).
+
+   The final top-4 keeps one chunk per metadata `source`, so the four results
+   cover up to four distinct documents; the lexical channel fails soft to an
+   empty list.
 4. **Generation** (`app.rag.SYSTEM_PROMPTS`, per-language) — the answer model
    replies in plain, spoken-style language and is instructed to quote the exact
    policy statements it relies on.
@@ -99,14 +108,15 @@ The product's integrity is enforced by code, not just by prompt wording:
   as a verified eligibility decision (`app/rag.SYSTEM_PROMPTS` honours this;
   `app/ingest._chunk_metadata` stamps it at ingestion).
 - **Quotes are machine-verified.** The model emits `> text [source, status]`
-  lines; `app/quotes.py` parses them and verifies each against the retrieved
-  context — exact normalized containment, or ≥0.85 `difflib` similarity. A
-  quote that fails (`verified: false`) is surfaced to the user, never silent
-  and never inserted by the system.
+  lines; `app/quotes.py` parses them and verifies exact normalized containment
+  against the specifically named retrieved source and matching status. A quote
+  that fails (`verified: false`) is surfaced to the user, never silent and
+  never inserted by the system.
 - **Bound inputs.** Query text is 2–2000 chars; profile payloads, free-text,
   lists are length- and size-capped (HTTP 422, never logged as content).
 - **Protected ingestion.** `POST /ingest` requires `X-Admin-Token`; no token
-  configured → 503. Startup auto-ingestion stays idempotent (content-hash ids).
+  configured → 503. Ingestion atomically reconciles source-aware chunks and its
+  corpus/model marker after all embeddings succeed.
 
 ---
 
@@ -118,8 +128,8 @@ The product's integrity is enforced by code, not just by prompt wording:
 (`query:` / `passage:` prefixes) transparently via `E5PrefixEmbeddings`. This
 fixes semantically weak Devanagari retrieval, which matters because the audience
 asks in Hindi/Hinglish. Changing the model requires re-embedding:
-`python scripts/reembed.py --yes` (deletes this collection's vectors, re-ingests,
-and records provenance so startup can warn if they ever drift).
+`python scripts/reembed.py` (embeds the complete corpus before atomically
+reconciling rows and recording the matching generation/model marker).
 
 ### 5.2 Structured quotes with verification
 `app/quotes.py` provides pure `parse_quotes` / `verify_quotes`; the stream emits
@@ -129,10 +139,31 @@ data instead of hopeful prose.
 
 ### 5.3 Hybrid retrieval + optional reranking
 `app/retrieval.py` implements `rrf_fuse` (Reciprocal Rank Fusion, k=60) over
-vector + Postgres full-text, with an optional `BAAI/bge-reranker-base`
-cross-encoder stage behind `ENABLE_RERANKER` (kept off for small free-tier VPSes;
-loaded lazily, never in tests). The FTS column/index is created idempotently at
-startup (`app/db.ensure_fts_index`).
+**three** ranked channels, so no tunable weight is needed between them:
+- *Dense vector*: pgvector cosine similarity in the multilingual embedding
+  space (`VECTOR_TOP_K` = 12) — good at semantic paraphrases, but weak on
+  Romanized Hindi and bare scheme names.
+- *Full-text*: Postgres `tsvector` with `websearch_to_tsquery('english', …)` and
+  `ts_rank` (`FTS_LIMIT` = 12) — good at exact English keyword matches that
+  embeddings can miss.
+- *Lexical scheme-name*: scores the canonical source-slug tokens of the pinned
+  corpus generation against salient query tokens (English + Hinglish stopwords
+  removed), then fetches the best-matching chunk per matched source — this is
+  what anchors explicit scheme names/aliases such as `pm kisan`, `pm-sym`,
+  `startup india`, and `dpiit`, where the first two channels are weakest.
+
+The fused ranking then keeps the best chunk per metadata `source` before the
+final top-4 (`FINAL_K`), so the four results cover up to four distinct documents
+instead of several chunks of the same file; fused rank order is preserved. The
+distinct-source scan for the lexical channel is memoized per corpus generation
+(`_generation_sources`, `lru_cache`), and a rebuild activates a new generation
+id that naturally invalidates the entry. All three channels filter the captured
+corpus generation so a request never fuses hits from a mixed corpus, and the
+lexical channel fails soft: any error is logged and degraded to an empty list.
+An optional `BAAI/bge-reranker-base` cross-encoder stage re-scores the fused
+shortlist behind `ENABLE_RERANKER` (kept off for small free-tier VPSes; loaded
+lazily, never in tests). The FTS column/index is created idempotently at startup
+(`app/db.ensure_fts_index`).
 
 ### 5.4 Evaluation as a regression gate
 `eval/run_eval.py` now scores **faithfulness, answer_relevancy,
@@ -181,7 +212,7 @@ Environment variables (`.env.example` documents all of them):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GROQ_API_KEY` | (blank → demo) | live answers; also needed for RAGAS eval |
+| `GROQ_API_KEY` | (blank → demo) | live answers; also needed for generation eval |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | answer + agent model |
 | `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | normalization / cheap tasks |
 | `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | local embeddings (E5-prefixed) |

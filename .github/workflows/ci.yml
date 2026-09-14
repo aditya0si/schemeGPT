@@ -5,23 +5,34 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   data:
     name: Data validation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Compile all Python modules
-        run: python -m py_compile app/*.py scripts/validate_data.py eval/run_eval.py streamlit_app.py
+        run: >-
+          python -m py_compile app/*.py scripts/*.py eval/*.py
+          streamlit_app.py
       - name: Validate corpus (stdlib-only)
         run: python scripts/validate_data.py
 
   tests:
     name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,18 +40,20 @@ jobs:
           python-version: "3.12"
           cache: pip
       # CPU-only torch keeps the CI install small and fast; requirements.txt
-      # leaves torch unpinned (transitive via sentence-transformers), so the
-      # preinstalled wheel satisfies it.
+      # leaves torch transitive via sentence-transformers.
       - name: Install CPU-only PyTorch
-        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Reject vulnerable Python dependencies
+        run: python -m pip_audit
       - name: Run tests (no DB, no Groq, no model downloads)
         run: python -m pytest -q
 
   web:
-    name: Web build
+    name: Web build and security audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -51,5 +64,11 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: Build production bundle
+        run: npm run build
+      - name: Reject dependency advisories
+        run: npm audit --audit-level=low

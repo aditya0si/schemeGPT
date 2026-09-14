@@ -5,7 +5,7 @@ embedding model is ``intfloat/multilingual-e5-small`` (384-dim, same pgvector
 column width as the previous ``all-MiniLM-L6-v2`` — only the vector space
 changes). E5 models are trained with task prefixes: queries must be embedded
 with ``"query: "`` and documents with ``"passage: "``. ``E5PrefixEmbeddings``
-applies the prefixes transparently so callers (PGVector, RAGAS, the hybrid
+applies the prefixes transparently so callers (PGVectorStore, evaluation, the hybrid
 retriever) never need to know about the convention.
 """
 
