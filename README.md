@@ -10,7 +10,7 @@
 [![CI](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml)
 [![Retrieval quality gate](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml)
 
-> **SchemeGPT** is an open-source, domain-specific Retrieval-Augmented Generation (RAG) and decision-support engine for Indian Government Schemes, Central Acts, and State/UT Public Welfare Directories. It combines hybrid dense/sparse search via `pgvector` and PostgreSQL full-text indexing with exact quote verification and deterministic citizen profile matching. The platform serves bilingual (English & Hindi) query responses with source-bound quote verification that rejects mismatched citations.
+> **SchemeGPT** is an open-source, domain-specific Retrieval-Augmented Generation (RAG) and decision-support engine for Indian Government Schemes, Central Acts, and State/UT Public Welfare Directories. It combines three-channel hybrid retrieval — pgvector dense embeddings, PostgreSQL `tsvector` full-text search, and a lexical scheme-name channel — fused with Reciprocal Rank Fusion, with the final top-4 kept source-diverse (one chunk per document). It also provides exact quote verification and deterministic citizen profile matching. The platform serves bilingual (English & Hindi) query responses with source-bound quote verification that rejects mismatched citations.
 
 ---
 
@@ -60,7 +60,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 ## Quick Numbers
 
 - **~2,100 scheme records**: 6 hand-verified central schemes, 36 state/UT directory seeds, and 2,052 automated myScheme-portal imports (each labeled with its data_status — the system never blurs verified and imported records).
-- **RRF hybrid retrieval**: Reciprocal Rank Fusion fusing dense `multilingual-e5-small` embeddings with PostgreSQL `tsvector` keyword search.
+- **RRF hybrid retrieval**: Reciprocal Rank Fusion fusing dense `multilingual-e5-small` embeddings, PostgreSQL `tsvector` keyword search, and a lexical scheme-name channel into a source-diverse top-4 (one chunk per document).
 - **Deterministic retrieval gate**: Required CI measures Hit@4 and MRR@4 across 16 source-labelled cases; live generation judging remains a separate manual experiment.
 - **FastAPI + Next.js 16**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 16 frontend and Streamlit demo.
 - **Bilingual EN/HI**: Native multi-lingual query understanding, cross-language vector retrieval, and localized UI controls.
@@ -70,7 +70,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 ## Key Features
 
-- **Hybrid RRF Search**: Merges cosine distance pgvector search with PostgreSQL `tsvector` keyword search using Reciprocal Rank Fusion.
+- **Hybrid RRF Search**: Fuses pgvector cosine search, PostgreSQL `tsvector` keyword search, and a lexical scheme-name channel with Reciprocal Rank Fusion, then keeps one chunk per source for a source-diverse top-4.
 - **Exact Quote Verification**: Cross-references every generated statement against source Markdown chunks via strict substring matching.
 - **Multi-Step Agent Retrieval**: Executes iterative tool-calling sequences for comparative, multi-scheme, and constraint-heavy queries.
 - **Deterministic Profile Matching**: Recommends applicable welfare programs based on demographic, income, occupational, and location parameters without ungrounded LLM guessing.
@@ -85,7 +85,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 | Capability / Metric | Naive RAG Baseline | SchemeGPT Pipeline |
 | :--- | :--- | :--- |
-| **Retrieval Mechanism** | Single-index dense vector search (misses acronyms and exact scheme identifiers) | Hybrid RRF combining dense `multilingual-e5-small` vectors + PostgreSQL `tsvector` full-text search |
+| **Retrieval Mechanism** | Single-index dense vector search (misses acronyms and exact scheme identifiers) | Three-channel RRF combining dense `multilingual-e5-small` vectors + PostgreSQL `tsvector` full-text search + a lexical scheme-name channel, returning one chunk per source |
 | **Citation & Factuality** | Generative citations prone to hallucinated eligibility limits and benefit sums | Deterministic substring quote verification against indexed scheme documentation |
 | **Complex Queries** | Single-turn context dump without multi-document synthesis | Multi-step agent loop with tool-based iterative retrieval and comparison |
 | **Evaluation Gate** | Ad-hoc manual spot checking without CI quality regression tracking | Deterministic 16-case Hit@4/MRR@4 retrieval gate, plus manual complete-coverage LLM-judge experiments |
@@ -154,7 +154,7 @@ p99 51 ms** (`loadtest/RESULTS.md`).
 **Retrieval quality:** `.github/workflows/eval.yml` runs a no-secret,
 deterministic gate against 16 source-labelled English, Hindi, Hinglish, profile,
 and jurisdiction cases. It exercises the production hybrid pgvector + Postgres
-full-text retriever and fails on incomplete coverage, retrieval errors,
+full-text + lexical scheme-name retriever and fails on incomplete coverage, retrieval errors,
 Hit@4 below 0.85, or MRR@4 below 0.60. Each run uploads
 `retrieval_scores.json`; run it locally with `python -m eval.retrieval_gate`
 after ingesting the corpus.
@@ -203,6 +203,7 @@ flowchart TD
     subgraph Storage["PostgreSQL 16 + pgvector"]
         VecStore["pgvector Cosine Search"]
         FTS["Postgres Full-Text Index (tsvector)"]
+        Lexical["Lexical Scheme-Name Channel"]
         ProfileDB["Saved Profiles & Token Hashes"]
     end
 
@@ -213,7 +214,7 @@ flowchart TD
     Agent --> ST
     ST --> VecStore
     Agent --> RRF
-    RRF --> VecStore & FTS
+    RRF --> VecStore & FTS & Lexical
     Agent --> Groq
     Groq --> EP_Query
     EP_Prof --> ProfileDB
@@ -244,7 +245,7 @@ SchemeGPT/
 ├── app/                      # FastAPI Backend Application
 │   ├── main.py               # API endpoints, FastAPI router, CORS & metrics
 │   ├── rag.py                # Core RAG pipeline, prompt templates & ChatGroq integration
-│   ├── retrieval.py          # Hybrid pgvector + Postgres Full-Text Search (RRF)
+│   ├── retrieval.py          # Hybrid vector + full-text + lexical scheme-name retrieval (RRF)
 │   ├── agent.py              # Multi-step tool-calling comparative retrieval agent
 │   ├── recommend.py          # Deterministic scheme recommendation engine
 │   ├── profiles.py           # Saved citizen profile storage & security

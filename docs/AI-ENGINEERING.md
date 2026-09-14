@@ -20,6 +20,7 @@ FastAPI (app/main.py)  ── social: GROQ_API_KEY (free tier)
 pgvector (Postgres 16, db/:5432, NOT published)
    • scheme_docs_v2            — application-owned vectors + JSON provenance
    • tsv tsvector + GIN index — full-text channel (hybrid retrieval)
+   • JSON `source` slugs      — lexical scheme-name channel (hybrid retrieval)
    • profiles table           — saved citizen profiles
 eval/                       deterministic retrieval + optional LLM judge
 scripts/                    data validation, re-embedding, dev stub API
@@ -54,13 +55,21 @@ pre-made demo answer (HTTP 200, never a traceback, never a leaked secret).
    Hindi, or Hinglish is rewritten by the *fast* model into one clean retrieval
    query. Any failure falls back to the raw question, so retrieval always
    proceeds. The answer language always matches the question language.
-3. **Retrieval** (`app.retrieval.HybridRetriever`) — two channels fused by
+3. **Retrieval** (`app.retrieval.HybridRetriever`) — three channels fused by
    **Reciprocal Rank Fusion**:
-   - *Vector*: cosine similarity in the multilingual embedding space.
+   - *Vector*: cosine similarity in the multilingual embedding space — strong on
+     semantic paraphrases, weak on Romanized Hindi and bare scheme names.
    - *Full-text*: Postgres `tsvector` with `websearch_to_tsquery` for exact
-     keyword hits that embedding fallback can miss.
+     English keyword hits that embedding fallback can miss.
+   - *Lexical*: canonical source-slug tokens matched against salient query
+     tokens (English + Hinglish stopwords removed), anchoring explicit scheme
+     names/aliases such as `pm kisan`, `pm-sym`, `startup india`, and `dpiit`.
    - *Optional rerank*: a cross-encoder re-scores the fused shortlist
      (`ENABLE_RERANKER=1`).
+
+   The final top-4 keeps one chunk per metadata `source`, so the four results
+   cover up to four distinct documents; the lexical channel fails soft to an
+   empty list.
 4. **Generation** (`app.rag.SYSTEM_PROMPTS`, per-language) — the answer model
    replies in plain, spoken-style language and is instructed to quote the exact
    policy statements it relies on.
@@ -130,10 +139,31 @@ data instead of hopeful prose.
 
 ### 5.3 Hybrid retrieval + optional reranking
 `app/retrieval.py` implements `rrf_fuse` (Reciprocal Rank Fusion, k=60) over
-vector + Postgres full-text, with an optional `BAAI/bge-reranker-base`
-cross-encoder stage behind `ENABLE_RERANKER` (kept off for small free-tier VPSes;
-loaded lazily, never in tests). The FTS column/index is created idempotently at
-startup (`app/db.ensure_fts_index`).
+**three** ranked channels, so no tunable weight is needed between them:
+- *Dense vector*: pgvector cosine similarity in the multilingual embedding
+  space (`VECTOR_TOP_K` = 12) — good at semantic paraphrases, but weak on
+  Romanized Hindi and bare scheme names.
+- *Full-text*: Postgres `tsvector` with `websearch_to_tsquery('english', …)` and
+  `ts_rank` (`FTS_LIMIT` = 12) — good at exact English keyword matches that
+  embeddings can miss.
+- *Lexical scheme-name*: scores the canonical source-slug tokens of the pinned
+  corpus generation against salient query tokens (English + Hinglish stopwords
+  removed), then fetches the best-matching chunk per matched source — this is
+  what anchors explicit scheme names/aliases such as `pm kisan`, `pm-sym`,
+  `startup india`, and `dpiit`, where the first two channels are weakest.
+
+The fused ranking then keeps the best chunk per metadata `source` before the
+final top-4 (`FINAL_K`), so the four results cover up to four distinct documents
+instead of several chunks of the same file; fused rank order is preserved. The
+distinct-source scan for the lexical channel is memoized per corpus generation
+(`_generation_sources`, `lru_cache`), and a rebuild activates a new generation
+id that naturally invalidates the entry. All three channels filter the captured
+corpus generation so a request never fuses hits from a mixed corpus, and the
+lexical channel fails soft: any error is logged and degraded to an empty list.
+An optional `BAAI/bge-reranker-base` cross-encoder stage re-scores the fused
+shortlist behind `ENABLE_RERANKER` (kept off for small free-tier VPSes; loaded
+lazily, never in tests). The FTS column/index is created idempotently at startup
+(`app/db.ensure_fts_index`).
 
 ### 5.4 Evaluation as a regression gate
 `eval/run_eval.py` now scores **faithfulness, answer_relevancy,
