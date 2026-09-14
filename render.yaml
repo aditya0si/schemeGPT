@@ -1,0 +1,43 @@
+# Render Blueprint — schemeGPT API + Postgres (pgvector).
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy: Render Dashboard → New → Blueprint → pick this repository → Apply.
+# GROQ_API_KEY is optional at that step: leave it blank and the API serves its
+# labelled demo answers (the zero-key fallback this repository already ships).
+#
+# Why this image and not the main Dockerfile: the default image bakes the 470 MB
+# multilingual-e5 embedding model, which needs ~2 GB of RAM — more than a free
+# instance (512 MB) has. Dockerfile.render installs the same CPU-only dependency
+# set without the model bake, so the service boots and serves the demo path.
+# A live (Groq-backed) answer needs the model; run that on a 2 GB instance with
+# the standard Dockerfile, or keep this deployment as the always-on demo.
+
+databases:
+  - name: schemegpt-db
+    databaseName: schemegpt
+    user: schemegpt
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: schemegpt-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /livez
+    dockerCommand: sh -c "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: schemegpt-db
+          property: connectionString
+      - key: EMBEDDING_MODEL
+        value: intfloat/multilingual-e5-small
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DATA_DIR
+        value: data

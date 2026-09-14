@@ -1,0 +1,29 @@
+# Render deployment image for the free instance type (512 MB RAM / 0.1 CPU).
+#
+# Same CPU-only dependency set as the main Dockerfile, but WITHOUT baking the
+# 470 MB multilingual-e5 embedding model into the image: loading that model needs
+# roughly 2 GB of RAM, which a free instance does not have. This image therefore
+# serves the API's labelled demo path (the zero-key fallback this repository
+# already ships) and would load the model lazily only if a live answer were
+# requested. Run a 2 GB instance with the standard Dockerfile when you need the
+# full embedding-backed corpus instead of the demo corpus.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements-api.txt requirements.txt ./
+RUN pip install --no-cache-dir \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch==2.14.0 && \
+    pip install --no-cache-dir -r requirements-api.txt
+
+COPY app ./app
+COPY data ./data
+
+EXPOSE 8000
+
+# Render injects $PORT; bind to it so the platform can route traffic to the app.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
