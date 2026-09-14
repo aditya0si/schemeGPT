@@ -29,8 +29,8 @@ so the API never needs public CORS and no browser origin allowlist changes.
    ```
 3. Copy the pooled connection string; it looks like
    `postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb`.
-4. The app needs the SQLAlchemy form — note the `+psycopg2` driver segment:
-   `postgresql+psycopg2://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb`
+4. The app needs the SQLAlchemy form — note the `+psycopg` driver segment:
+   `postgresql+psycopg://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb`
 
 ## 2. Populate the vector store (one command from your machine)
 
@@ -38,7 +38,7 @@ The API builds its index on first start, but for a corpus this size you want
 to control it explicitly. From the repo root with your local `.venv`:
 
 ```bash
-DATABASE_URL="postgresql+psycopg2://<neon-pooler-url>" \
+DATABASE_URL="postgresql+psycopg://<neon-pooler-url>" \
   python scripts/reembed.py --yes
 ```
 
@@ -46,7 +46,7 @@ That ingests `data/schemes`, `data/states` and `data/myscheme` with the
 configured embedding model. Verify:
 
 ```bash
-psql "<neon-url>" -c "SELECT count(*) FROM langchain_pg_embedding;"
+psql "<neon-url>" -c "SELECT count(*) FROM scheme_docs_v2;"
 ```
 
 ## 3. Fly.io — the API
@@ -56,11 +56,13 @@ psql "<neon-url>" -c "SELECT count(*) FROM langchain_pg_embedding;"
    ```bash
    fly launch --no-deploy --copy-config
    fly secrets set GROQ_API_KEY=... \
-     DATABASE_URL="postgresql+psycopg2://<neon-pooler-url>"
+     DATABASE_URL="postgresql+psycopg://<neon-pooler-url>"
    fly deploy
    ```
-3. Verify: `https://schemegpt-api.fly.dev/health` → `{"status": "ok"}`, and
-   `GET /coverage` should report the scaled corpus.
+3. Verify: `https://schemegpt-api.fly.dev/readyz` reports `status: ready`,
+   the configured mode, vector count, complete active corpus generation, and
+   embedding-model compatibility; then confirm `GET /coverage` reports the
+   scaled corpus.
 4. Optional: a custom domain via `fly certs add`.
 
 Notes:
@@ -86,7 +88,8 @@ Notes:
 ## 5. Post-deploy checklist
 
 ```bash
-curl https://<api>.fly.dev/health          # {"status":"ok"}
+curl https://<api>.fly.dev/livez          # {"status":"alive"}
+curl https://<api>.fly.dev/readyz          # dependency readiness + live/demo mode
 curl https://<api>.fly.dev/metrics         # counters, cache hit rate, tokens
 curl -X POST https://<api>.fly.dev/query \
   -H "Content-Type: application/json" \
@@ -100,8 +103,10 @@ Then load the site, ask a question, confirm tokens stream and quotes render.
 
 - **Secrets:** `.env` is git-ignored and never deployed; Fly secrets / Vercel
   env vars carry credentials. Rotate the Groq key if it was ever committed.
-- **DB migrations:** none — the schema is created idempotently by the app
-  (`langchain_pg_*` tables) and by the semantic cache (`query_cache`).
+- **DB migration:** the maintained `langchain-postgres` adapter writes to the
+  application-owned `scheme_docs_v2` table. Existing legacy `langchain_pg_*`
+  tables are left untouched for rollback; remove them only after validation.
+  The semantic cache owns `query_cache` separately.
 - **Re-ingestion:** repeat step 2 after corpus changes, then restart the API
   (`fly apps restart schemegpt-api`).
 - **Costs at free tier:** Neon ~0.5 GB storage (vectors for this corpus fit),

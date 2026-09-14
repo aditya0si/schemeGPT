@@ -4,23 +4,24 @@ Every eval run is appended to `eval/results/history.jsonl` with a UTC
 timestamp, an optional `--label`, the full config fingerprint (prompt version,
 embedding model, LLM models, reranker flag, per-directory corpus sizes), and
 the aggregate scores. This file narrates the runs worth remembering: what
-changed, what it cost, and what it bought. Numbers are RAGAS aggregates over
-`eval/questions.json` unless noted.
+changed, what it cost, and what it bought. Legacy entries below used RAGAS;
+current generation experiments use the explicit JSON judge in `eval/run_eval.py`.
 
 > Honesty note: judge LLM = Groq free tier (shared quota), 20 curated cases.
 > These are project-triage numbers, not benchmark claims.
 
 ## Run history
 
-### baseline-42docs — 2026-09-02 (first completed labeled run)
+### baseline-42docs — 2026-09-02 (retired incomplete legacy run)
 
 - **Corpus:** 42 documents (6 verified central schemes + 36 state/UT
   directory seeds) → 90 chunks.
 - **Config:** e5-small embeddings, hybrid retrieval (RRF), answer model
   gpt-oss-20b, judge gpt-oss-20b (this run predates the EVAL_JUDGE_MODEL
   split), no reranker, prompt 2026-08-19-quotes.
-- **Result:** faithfulness **0.667**, answer_relevancy **0.842**,
-  context_precision **0.698**, context_recall **0.600** (20 cases).
+- **Legacy aggregate (not a valid baseline):** faithfulness **0.667**, answer_relevancy **0.842**,
+  context_precision **0.698**, context_recall **0.600**. Metric coverage was incomplete,
+  so these values are retained only as historical context and must not be cited as results.
 - **Honest caveats:** (1) one case's retrieval was emptied by a since-fixed
   semantic-cache bug (an eval answer got cached, then a paraphrased eval case
   was served from it — evals now disable the cache in `run()`); (2) three
@@ -63,8 +64,9 @@ changed, what it cost, and what it bought. Numbers are RAGAS aggregates over
 
 ## Regression gate
 
-`python -m eval.run_eval --gate` fails (exit 1) when aggregate
-faithfulness < 0.85 or answer_relevancy < 0.70 vs the floors in
-`eval/run_eval.py`, and CI runs the unit suite on every push. The eval-gate
-workflow (`.github/workflows/eval.yml`) runs the full RAGAS gate weekly and
-on demand once `GROQ_API_KEY` is set as a repository secret.
+`.github/workflows/eval.yml` is the required, secret-free retrieval gate: it
+runs the production hybrid retriever over all 16 labelled cases and enforces
+Hit@4 >= 0.85 and MRR@4 >= 0.60 with complete coverage. The separate manual
+`.github/workflows/generation-eval.yml` experiment uses Groq only when its
+repository secret is configured; `--gate` rejects missing scores and judge
+errors as well as below-floor aggregates.

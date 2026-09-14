@@ -1,16 +1,16 @@
 # SchemeGPT 🇮🇳
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688.svg)](https://fastapi.tiangolo.com/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![pgvector](https://img.shields.io/badge/pgvector-PostgreSQL%2016-336791.svg)](https://github.com/pgvector/pgvector)
 [![Groq gpt-oss](https://img.shields.io/badge/LLM-Groq%20gpt-oss--120b-orange.svg)](https://groq.com/)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
-[![RAGAS Evaluation](https://img.shields.io/badge/Eval-RAGAS%200.2.15-green.svg)](https://github.com/explodinggradients/ragas)
+[![Quality Evaluation](https://img.shields.io/badge/Eval-Hit%404%20%2B%20MRR%404-green.svg)](eval/retrieval_gate.py)
 [![CI](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/ci.yml)
-[![RAGAS eval gate](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml)
+[![Retrieval quality gate](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml/badge.svg)](https://github.com/aditya0si/schemeGPT/actions/workflows/eval.yml)
 
-> **SchemeGPT** is an open-source, domain-specific Retrieval-Augmented Generation (RAG) and decision-support engine for Indian Government Schemes, Central Acts, and State/UT Public Welfare Directories. It combines hybrid dense/sparse search via `pgvector` and PostgreSQL full-text indexing with exact quote verification and deterministic citizen profile matching. The platform serves bilingual (English & Hindi) query responses with verified source citations to eliminate hallucinations.
+> **SchemeGPT** is an open-source, domain-specific Retrieval-Augmented Generation (RAG) and decision-support engine for Indian Government Schemes, Central Acts, and State/UT Public Welfare Directories. It combines hybrid dense/sparse search via `pgvector` and PostgreSQL full-text indexing with exact quote verification and deterministic citizen profile matching. The platform serves bilingual (English & Hindi) query responses with source-bound quote verification that rejects mismatched citations.
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## 📌 Keywords & Technical Domain Tags
 
-`RAG` · `Retrieval-Augmented Generation` · `AI Engineering` · `pgvector` · `Reciprocal Rank Fusion (RRF)` · `FastAPI` · `Next.js 15` · `Streamlit` · `Groq gpt-oss` · `LangChain` · `Sentence-Transformers` · `Indian Government Schemes` · `MyScheme India` · `Public Welfare AI` · `SSE Streaming` · `Quote Verification` · `RAGAS Offline Evaluation` · `Multi-Step Tool-Calling Agent` · `Bilingual NLP (English + Hindi)` · `Docker Compose`
+`RAG` · `Retrieval-Augmented Generation` · `AI Engineering` · `pgvector` · `Reciprocal Rank Fusion (RRF)` · `FastAPI` · `Next.js 16` · `Streamlit` · `Groq gpt-oss` · `LangChain` · `Sentence-Transformers` · `Indian Government Schemes` · `MyScheme India` · `Public Welfare AI` · `SSE Streaming` · `Quote Verification` · `Deterministic Retrieval Evaluation` · `Multi-Step Tool-Calling Agent` · `Bilingual NLP (English + Hindi)` · `Docker Compose`
 
 ---
 
@@ -43,7 +43,7 @@
   - [Production VPS Runbook](#production-vps-runbook)
 - [Local Development](#local-development)
 - [Groq API Key & Demo Fallback](#groq-api-key--demo-fallback)
-- [Evaluation Suite (RAGAS)](#evaluation-suite-ragas)
+- [Evaluation Suite](#evaluation-suite)
 - [Smoke Verification](#smoke-verification)
 - [Operational Disclaimers](#operational-disclaimers)
 - [Roadmap](#roadmap)
@@ -61,8 +61,8 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 - **~2,100 scheme records**: 6 hand-verified central schemes, 36 state/UT directory seeds, and 2,052 automated myScheme-portal imports (each labeled with its data_status — the system never blurs verified and imported records).
 - **RRF hybrid retrieval**: Reciprocal Rank Fusion fusing dense `multilingual-e5-small` embeddings with PostgreSQL `tsvector` keyword search.
-- **RAGAS 4-metric gate**: Automated CI regression tests enforcing faithfulness, answer relevancy, context precision, and context recall floors.
-- **FastAPI + Next.js 15**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 15 frontend and Streamlit demo.
+- **Deterministic retrieval gate**: Required CI measures Hit@4 and MRR@4 across 16 source-labelled cases; live generation judging remains a separate manual experiment.
+- **FastAPI + Next.js 16**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 16 frontend and Streamlit demo.
 - **Bilingual EN/HI**: Native multi-lingual query understanding, cross-language vector retrieval, and localized UI controls.
 - **Quote-verified answers**: Deterministic exact substring validation preventing fabricated clauses, amounts, or guidelines.
 
@@ -75,8 +75,8 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 - **Multi-Step Agent Retrieval**: Executes iterative tool-calling sequences for comparative, multi-scheme, and constraint-heavy queries.
 - **Deterministic Profile Matching**: Recommends applicable welfare programs based on demographic, income, occupational, and location parameters without ungrounded LLM guessing.
 - **SSE Token Streaming**: Streams live answer tokens and intermediate agent search events via Server-Sent Events.
-- **Offline Evaluation Gate**: Runs automated RAGAS benchmark suites with regression gates in CI to block quality regressions.
-- **Dual Client Interfaces**: Provides an editorial Next.js 15 web application alongside an interactive Streamlit demonstration interface.
+- **Retrieval Quality Gate**: Runs a secret-free production retrieval benchmark in required CI and rejects incomplete or below-floor runs.
+- **Dual Client Interfaces**: Provides an editorial Next.js 16 web application alongside an interactive Streamlit demonstration interface.
 - **Zero-Key Demo Fallback**: Returns indexed reference answers when external LLM endpoints are unavailable or unconfigured.
 
 ---
@@ -88,7 +88,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 | **Retrieval Mechanism** | Single-index dense vector search (misses acronyms and exact scheme identifiers) | Hybrid RRF combining dense `multilingual-e5-small` vectors + PostgreSQL `tsvector` full-text search |
 | **Citation & Factuality** | Generative citations prone to hallucinated eligibility limits and benefit sums | Deterministic substring quote verification against indexed scheme documentation |
 | **Complex Queries** | Single-turn context dump without multi-document synthesis | Multi-step agent loop with tool-based iterative retrieval and comparison |
-| **Evaluation Gate** | Ad-hoc manual spot checking without CI quality regression tracking | Automated RAGAS CI test harness enforcing faithfulness and relevancy thresholds |
+| **Evaluation Gate** | Ad-hoc manual spot checking without CI quality regression tracking | Deterministic 16-case Hit@4/MRR@4 retrieval gate, plus manual complete-coverage LLM-judge experiments |
 | **Multilingual Handling** | Standard English-only tokenization with degraded cross-lingual recall | Native bilingual vector space alignment and localized query normalization |
 | **Streaming & Telemetry** | Monolithic blocking response with no step visibility | Real-time SSE streaming with inline agent execution telemetry and quote verification events |
 
@@ -141,36 +141,38 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 ## Measured Results
 
-Reproduced with the commands in `eval/` and `loadtest/`; raw run history in
-`eval/results/history.jsonl`, narration in [`EXPERIMENTS.md`](EXPERIMENTS.md).
+Reproduce these with the commands in `eval/` and `loadtest/`. CI uploads
+machine-readable evaluation artifacts for each run; local live-run history is
+intentionally git-ignored. Experiment context lives in
+[`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 **Serving layer** (Locust, 25 concurrent users, 60 s, demo-mode SSE — full
 `sources → token* → done` event sequences required for success): **860/860
 streams succeeded, 0 failures, 14.5 streams/s, median 11 ms, p95 25 ms,
 p99 51 ms** (`loadtest/RESULTS.md`).
 
-**Answer quality (RAGAS, 20 curated cases, Groq free-tier judge):**
+**Retrieval quality:** `.github/workflows/eval.yml` runs a no-secret,
+deterministic gate against 16 source-labelled English, Hindi, Hinglish, profile,
+and jurisdiction cases. It exercises the production hybrid pgvector + Postgres
+full-text retriever and fails on incomplete coverage, retrieval errors,
+Hit@4 below 0.85, or MRR@4 below 0.60. Each run uploads
+`retrieval_scores.json`; run it locally with `python -m eval.retrieval_gate`
+after ingesting the corpus.
 
-| Run | Corpus | faithfulness | answer_relevancy | context_precision | context_recall |
-| --- | --- | --- | --- | --- | --- |
-| baseline-42docs (2026-09-02) | 42 docs / 90 chunks | 0.667 | 0.842 | 0.698 | 0.600 |
-| scaled-myscheme | + 2,052 myScheme imports | pending quota window | pending | pending | pending |
-
-> **Read these numbers honestly.** They are the first labeled run after two
-> forced changes: Groq decommissioned the Llama-3.x models mid-project (the
-> pipeline now runs `gpt-oss-120b`/`gpt-oss-20b`), and the eval set grew from
-> 12 to 20 harder cases (Hinglish, Hindi, comparative, multi-hop) while the
-> judge model also changed. Two of twenty cases were additionally skewed by a
-> since-fixed semantic-cache interaction (a cached test payload served one
-> eval case) and three judge calls hit free-tier rate limits. The free tier
-> also imposes a 200k tokens/day per-model budget, so full-set runs must be
-> spaced out. Regenerate any time:
-> `python -m eval.run_eval --gate --label <label>`.
+**Generation quality (LLM judge):** live LLM judging is a manual experiment because
+Groq's free-tier daily quota can make infrastructure failures look like quality
+regressions. The previous framework report was incomplete (different metrics
+had only 5–18 scores out of 20), so it is not presented as a valid baseline.
+`python -m eval.run_eval --gate` now requires every selected row to be completely
+scored with zero pipeline/evaluation errors before aggregate floors can pass.
+The manual `Live generation quality experiment` workflow uploads the report, scores, and run
+history; no generation baseline will be published until a full set completes.
 
 **Cost engineering:** per-model token usage is tracked on `/metrics`
 (reference list-price mapping in `app/rag.py`), the semantic cache serves
-paraphrased repeats without an LLM call (hit rate on `/metrics`), and the
-per-IP token bucket (`RATE_LIMIT_RPM`, default 20/min) keeps a public
+paraphrased repeats without an LLM call (hit rate on `/metrics`), invalidates
+entries when the verifier contract, embedding model, answer model, answer-prompt
+version, or corpus generation changes, and re-verifies quote flags on every hit. The per-IP token bucket (`RATE_LIMIT_RPM`, default 20/min) keeps a public
 deployment inside the shared free-tier quota.
 
 ---
@@ -180,7 +182,7 @@ deployment inside the shared free-tier quota.
 ```mermaid
 flowchart TD
     subgraph Clients["User Interfaces"]
-        UI_Web["Next.js 15 Web Portal (Port 3000)"]
+        UI_Web["Next.js 16 Web Portal (Port 3000)"]
         UI_Streamlit["Streamlit Chat Demo (Port 8501)"]
     end
 
@@ -223,14 +225,14 @@ flowchart TD
 
 ## Tech Stack
 
-- **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+), Uvicorn, Pydantic v2
-- **Vector Store & Database**: [PostgreSQL 16](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) extension
+- **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.12), Uvicorn, Pydantic v2
+- **Vector Store & Database**: [PostgreSQL 16](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) and the maintained `langchain-postgres` `PGVectorStore` adapter
 - **LLM Engine**: [Groq API](https://console.groq.com/) using `openai/gpt-oss-120b` (synthesis) and `openai/gpt-oss-20b` (routing)
 - **Embedding Model**: `intfloat/multilingual-e5-small` (384 dimensions, local PyTorch CPU execution)
 - **Frontend Applications**:
-  - **Next.js 15**: TypeScript, Tailwind CSS, React 19 (`web/`)
+  - **Next.js 16**: TypeScript, Tailwind CSS, React 19 (`web/`)
   - **Streamlit**: Python Chat UI (`streamlit_app.py`)
-- **Evaluation Suite**: [RAGAS 0.2.15](https://github.com/explodinggradients/ragas) + custom runner (`eval/run_eval.py`)
+- **Evaluation Suite**: deterministic source-retrieval gate (`eval/retrieval_gate.py`) plus an optional provider-neutral LLM-judge experiment (`eval/run_eval.py`)
 - **Containerization**: Docker, Docker Compose
 
 ---
@@ -256,9 +258,9 @@ SchemeGPT/
 │   ├── states/*.md           # 36 State / UT directory seed markdown records
 │   ├── scheme_catalog.json   # Catalog metadata & eligibility tags
 │   └── india_states.json     # Official state/UT directory mapping
-├── web/                      # Next.js 15 Web Portal Application
+├── web/                      # Next.js 16 Web Portal Application
 ├── streamlit_app.py          # Interactive Streamlit Demo Chat Application
-├── eval/                     # RAGAS Evaluation Suite
+├── eval/                     # Retrieval and generation evaluation suite
 │   ├── run_eval.py           # Evaluation runner with quality thresholds & reporting
 │   └── questions.json        # Curated test evaluation dataset (English + Hindi)
 ├── loadtest/                 # Locust load test for the SSE endpoint (+ RESULTS.md)
@@ -286,8 +288,10 @@ SchemeGPT/
 
 | Endpoint | Method | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| `GET /health` | `GET` | System health check and status verification. | None |
-| `POST /query` | `POST` | Primary RAG question-answering endpoint returning verified answers and source quotes. | None |
+| `GET /livez` | `GET` | Process liveness probe with no dependency I/O. | None |
+| `GET /readyz` | `GET` | Traffic-readiness check for database, complete active corpus generation, and embedding-model compatibility. | None |
+| `GET /health` | `GET` | Backwards-compatible database health check. | None |
+| `POST /query` | `POST` | Primary hybrid-RAG endpoint returning source-bound verified quotes. | None |
 | `POST /query/stream` | `POST` | SSE real-time streaming RAG answer output with step events. | None |
 | `GET /states` | `GET` | List all 36 Indian States and Union Territories directory records. | None |
 | `GET /coverage` | `GET` | Report total catalog coverage (verified schemes vs directory seeds). | None |
@@ -389,23 +393,26 @@ The only external API dependency is Groq for LLM inference. Get a free key at [c
 
 ---
 
-## Evaluation Suite (RAGAS)
+## Evaluation Suite
 
-Offline evaluation measures retrieval and generation quality against curated cases in `eval/questions.json`.
+Evaluation measures retrieval and generation quality against curated cases in `eval/questions.json`. Required CI uses secret-free Hit@4/MRR@4; the optional generation experiment uses the configured Groq judge model.
 
 | Metric | Target Floor | Description |
 | :--- | :--- | :--- |
 | **Faithfulness** | `>= 0.85` | Ensures answer claims are directly grounded in retrieved context chunks. |
 | **Answer Relevancy** | `>= 0.70` | Measures alignment between the user's question and generated response. |
-| **Context Precision** | measured | Evaluates rank-order precision of relevant scheme passages retrieved (no gate floor yet; tracked per run). |
-| **Context Recall** | measured | Verifies whether all ground-truth reference passages were retrieved (no gate floor yet; tracked per run). |
+| **Context Precision** | measured | LLM-judge estimate of how much retrieved context is relevant (no gate floor yet). |
+| **Context Recall** | measured | LLM-judge estimate of whether context covers the reference answer (no gate floor yet). |
 
 ```bash
-# Install evaluation dependencies
-pip install -r requirements-eval.txt
+# Install production plus evaluation dependencies
+pip install -r requirements.txt -r requirements-eval.txt
 
-# Run evaluation suite with CI regression gate
-python -m eval.run_eval --limit 5
+# Deterministic production-retrieval gate (no LLM key; database required)
+python -m eval.retrieval_gate
+
+# Optional live generation experiment (Groq quota applies)
+python -m eval.run_eval --limit 5 --gate
 ```
 
 Evaluation outputs are generated to:
@@ -420,7 +427,7 @@ Run quick validation tests locally or on CI without external API dependencies:
 
 ```bash
 # 1. Syntax & compilation check
-python -m py_compile app/*.py streamlit_app.py scripts/validate_data.py eval/run_eval.py
+python -m py_compile app/*.py streamlit_app.py scripts/*.py eval/*.py
 
 # 2. Schema and state directory validation
 python scripts/validate_data.py
@@ -428,8 +435,9 @@ python scripts/validate_data.py
 # 3. Docker Compose configuration verification
 docker compose config --quiet
 
-# 4. Live API health check
-curl http://localhost:8000/health
+# 4. Liveness and dependency readiness checks
+curl http://localhost:8000/livez
+curl http://localhost:8000/readyz
 curl http://localhost:8000/coverage
 ```
 

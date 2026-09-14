@@ -18,10 +18,10 @@ FastAPI (app/main.py)  ── social: GROQ_API_KEY (free tier)
    │                     embeddings: local sentence-transformers (offline)
    ▼
 pgvector (Postgres 16, db/:5432, NOT published)
-   • langchain_pg_embedding   — 384-dim vectors (cmetadata provenance)
+   • scheme_docs_v2            — application-owned vectors + JSON provenance
    • tsv tsvector + GIN index — full-text channel (hybrid retrieval)
    • profiles table           — saved citizen profiles
-eval/                       RAGAS offline harness (dev only, not in image)
+eval/                       deterministic retrieval + optional LLM judge
 scripts/                    data validation, re-embedding, dev stub API
 data/                       Markdown corpus (6 verified schemes + 36 state/UT seeds)
 ```
@@ -99,14 +99,15 @@ The product's integrity is enforced by code, not just by prompt wording:
   as a verified eligibility decision (`app/rag.SYSTEM_PROMPTS` honours this;
   `app/ingest._chunk_metadata` stamps it at ingestion).
 - **Quotes are machine-verified.** The model emits `> text [source, status]`
-  lines; `app/quotes.py` parses them and verifies each against the retrieved
-  context — exact normalized containment, or ≥0.85 `difflib` similarity. A
-  quote that fails (`verified: false`) is surfaced to the user, never silent
-  and never inserted by the system.
+  lines; `app/quotes.py` parses them and verifies exact normalized containment
+  against the specifically named retrieved source and matching status. A quote
+  that fails (`verified: false`) is surfaced to the user, never silent and
+  never inserted by the system.
 - **Bound inputs.** Query text is 2–2000 chars; profile payloads, free-text,
   lists are length- and size-capped (HTTP 422, never logged as content).
 - **Protected ingestion.** `POST /ingest` requires `X-Admin-Token`; no token
-  configured → 503. Startup auto-ingestion stays idempotent (content-hash ids).
+  configured → 503. Ingestion atomically reconciles source-aware chunks and its
+  corpus/model marker after all embeddings succeed.
 
 ---
 
@@ -118,8 +119,8 @@ The product's integrity is enforced by code, not just by prompt wording:
 (`query:` / `passage:` prefixes) transparently via `E5PrefixEmbeddings`. This
 fixes semantically weak Devanagari retrieval, which matters because the audience
 asks in Hindi/Hinglish. Changing the model requires re-embedding:
-`python scripts/reembed.py --yes` (deletes this collection's vectors, re-ingests,
-and records provenance so startup can warn if they ever drift).
+`python scripts/reembed.py` (embeds the complete corpus before atomically
+reconciling rows and recording the matching generation/model marker).
 
 ### 5.2 Structured quotes with verification
 `app/quotes.py` provides pure `parse_quotes` / `verify_quotes`; the stream emits
@@ -181,7 +182,7 @@ Environment variables (`.env.example` documents all of them):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GROQ_API_KEY` | (blank → demo) | live answers; also needed for RAGAS eval |
+| `GROQ_API_KEY` | (blank → demo) | live answers; also needed for generation eval |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | answer + agent model |
 | `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | normalization / cheap tasks |
 | `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | local embeddings (E5-prefixed) |
