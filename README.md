@@ -153,11 +153,20 @@ p99 51 ms** (`loadtest/RESULTS.md`).
 
 **Retrieval quality:** `.github/workflows/eval.yml` runs a no-secret,
 deterministic gate against 16 source-labelled English, Hindi, Hinglish, profile,
-and jurisdiction cases. It exercises the production hybrid pgvector + Postgres
-full-text + lexical scheme-name retriever and fails on incomplete coverage, retrieval errors,
-Hit@4 below 0.85, or MRR@4 below 0.60. Each run uploads
-`retrieval_scores.json`; run it locally with `python -m eval.retrieval_gate`
-after ingesting the corpus.
+and jurisdiction cases. It exercises the production three-channel hybrid
+retriever (dense pgvector + Postgres full-text + lexical scheme-name matching,
+fused with RRF and kept source-diverse in the top-4) and fails on incomplete
+coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. On the full
+ingested corpus generation `7213926b8590933d...` (2,105 markdown files, ~20k
+chunks), run `34847304948` (pull request) and its follow-up on `main`
+(`34850488645`) measured **Hit@4 0.875** and **MRR@4 0.765625** across 16/16
+completed cases with 0 retrieval errors; each run uploads
+`retrieval_scores.json`. This is the measured result of those CI runs on that
+corpus generation, reproducible with `python -m eval.retrieval_gate` after
+ingest, not an ongoing production benchmark. Retrieval quality remains a tracked
+metric, not a solved problem: the two remaining misses are the PM-SYM Hinglish
+question and the unorganised-worker profile question, which have no lexical
+anchor.
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality

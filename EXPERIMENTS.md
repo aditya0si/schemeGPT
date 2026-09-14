@@ -47,6 +47,25 @@ current generation experiments use the explicit JSON judge in `eval/run_eval.py`
   the free-tier daily token budget and regenerates with
   `python -m eval.run_eval --gate --label scaled-myscheme`.
 
+### retrieval-gate-full-corpus — 2026-09-14 (measured retrieval result)
+
+- **Corpus:** full ingested corpus generation `7213926b8590933d...` (2,105
+  markdown files, ~20k chunks) in the pgvector service.
+- **Method change:** added a third lexical scheme-name channel over the pinned
+  generation source slugs and fused it with dense pgvector and Postgres
+  full-text via RRF; deepened both vector/FTS pools to 12/12 and kept the final
+  top-4 source-diverse (one chunk per source).
+- **Result:** required deterministic gate `.github/workflows/eval.yml`, run
+  `34847304948` (pull request) and main follow-up `34850488645` (both green):
+  16/16 labelled cases completed, 0 retrieval errors, **Hit@4 0.875** and
+  **MRR@4 0.765625** (floors Hit@4 >= 0.85 and MRR@4 >= 0.60, unchanged).
+- **Honest caveats:** this is the measured result of those CI runs on that
+  corpus generation, not an ongoing production benchmark. The two remaining
+  misses are the PM-SYM Hinglish question and the unorganised-worker profile
+  question, which have no lexical anchor; retrieval quality remains a tracked
+  metric, not a solved problem.
+- **Reproduce:** `python -m eval.retrieval_gate` after ingesting the corpus.
+
 ## Framework
 
 - **Question normalization rewrite** (fast model): cheap, per-query, no
