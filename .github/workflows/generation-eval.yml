@@ -1,0 +1,87 @@
+name: Live generation quality experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Number of generation cases (Groq free-tier quota applies)"
+        required: true
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  live-generation-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: scheme
+          POSTGRES_PASSWORD: scheme
+          POSTGRES_DB: schemegpt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scheme -d schemegpt"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://scheme:scheme@localhost:5432/schemegpt
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check optional Groq configuration
+        id: groq
+        shell: bash
+        run: |
+          if [[ -n "$GROQ_API_KEY" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "GROQ_API_KEY is not configured; live experiment skipped."
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.groq.outputs.available == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install CPU-only PyTorch
+        if: steps.groq.outputs.available == 'true'
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+
+      - name: Install production and evaluation dependencies
+        if: steps.groq.outputs.available == 'true'
+        run: pip install -r requirements.txt -r requirements-eval.txt
+
+      - name: Ingest corpus
+        if: steps.groq.outputs.available == 'true'
+        run: python -c "from app.ingest import ingest; print(f'ingested_chunks={ingest()}')"
+
+      - name: Run gated live generation and LLM judge
+        if: steps.groq.outputs.available == 'true'
+        run: >-
+          python -m eval.run_eval
+          --limit "${{ inputs.limit }}"
+          --gate
+          --label "github-${{ github.run_id }}"
+
+      - name: Upload live experiment artifacts
+        if: always() && steps.groq.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-generation-${{ github.run_id }}
+          path: |
+            eval/results/report.md
+            eval/results/scores.json
+            eval/results/history.jsonl
+          if-no-files-found: warn
+          retention-days: 30
