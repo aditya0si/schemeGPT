@@ -37,7 +37,7 @@ services:
       # extra tools (curl/wget) are needed in the image.
       # The long start_period absorbs first-start embedding model download and
       # auto-ingestion before the API is declared unhealthy.
-      test: ["CMD", "python", "-c", "import json,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8000/health', timeout=5)); assert d.get('status')=='ok'"]
+      test: ["CMD", "python", "-c", "import json,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8000/readyz', timeout=5)); assert d.get('status')=='ready'"]
       interval: 10s
       timeout: 5s
       retries: 10

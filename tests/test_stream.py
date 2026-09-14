@@ -112,4 +112,78 @@ async def test_stream_demo_emits_quotes_before_done(client):
     assert set(q) >= {"text", "source", "status", "verified", "matched_source"}
     # The demo answer quotes a real sentence from pm-kisan.md, so it verifies.
     assert q["verified"] is True
-    assert q["matched_source"] == "pm-kisan.md"
+    assert q["matched_source"] == "schemes/pm-kisan.md"
+
+async def test_stream_serves_validated_live_cache_with_configured_provider(monkeypatch):
+    import app.stream as stream
+
+    monkeypatch.setattr(stream.settings, "groq_api_key", "configured")
+    monkeypatch.setattr(
+        stream.semantic_cache, "capture_generation", lambda: "gen-1"
+    )
+    cached = {
+        "answer": "> Policy fact. [schemes/fact.md, sample_verified]",
+        "sources": [
+            {
+                "source": "schemes/fact.md",
+                "content": "Policy fact.",
+                "data_status": "sample_verified",
+            }
+        ],
+        "quotes": [{"verified": True}],
+        "mode": "live",
+        "language": "en",
+    }
+    monkeypatch.setattr(stream.semantic_cache, "lookup", lambda *args: cached)
+    monkeypatch.setattr(
+        stream,
+        "get_llm",
+        lambda: (_ for _ in ()).throw(AssertionError("cache hit must not call LLM")),
+    )
+
+    raw = "".join([part async for part in stream.stream_answer("cached question")])
+    events = parse_sse(raw)
+
+    assert events[-1][0] == "done"
+    assert events[-1][1]["mode"] == "live"
+    assert events[-1][1]["cached"] is True
+    quotes = next(data for name, data in events if name == "quotes")
+    assert quotes[0]["verified"] is True
+
+
+async def test_live_stream_uses_shared_retrieval_pipeline(monkeypatch):
+    from langchain_core.documents import Document
+
+    import app.stream as stream
+
+    source = Document(
+        page_content="Policy fact.",
+        metadata={"source": "schemes/fact.md", "data_status": "sample_verified"},
+    )
+    calls = []
+
+    def retrieve(question, language, profile, generation):
+        calls.append((question, language, profile, generation))
+        return [source], [{"tool": "search_schemes", "summary": "1 result"}]
+
+    class Chain:
+        async def astream(self, payload, config):
+            assert payload["context"] == [source]
+            yield "> Policy fact. [schemes/fact.md, sample_verified]"
+
+    monkeypatch.setattr(stream.settings, "groq_api_key", "configured")
+    monkeypatch.setattr(stream, "get_llm", lambda: object())
+    monkeypatch.setattr(
+        stream.semantic_cache, "capture_generation", lambda: "gen-1"
+    )
+    monkeypatch.setattr(stream.semantic_cache, "lookup", lambda *args: None)
+    monkeypatch.setattr(stream.semantic_cache, "store", lambda *args: None)
+    monkeypatch.setattr(stream, "retrieve_context", retrieve)
+    monkeypatch.setattr(stream, "build_answer_chain", lambda language: Chain())
+
+    raw = "".join([part async for part in stream.stream_answer("complex question")])
+    events = parse_sse(raw)
+    assert calls == [("complex question", "en", None, "gen-1")]
+    assert any(name == "step" for name, _ in events)
+    quotes = next(data for name, data in events if name == "quotes")
+    assert quotes[0]["verified"] is True

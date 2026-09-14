@@ -22,7 +22,12 @@ from langchain_core.retrievers import BaseRetriever
 from sqlalchemy import text
 
 from app.config import settings
-from app.db import COLLECTION_NAME, get_engine
+from app.db import (
+    VECTOR_GENERATION_COLUMN,
+    VECTOR_METADATA_COLUMN,
+    VECTOR_TABLE,
+    get_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,25 +72,31 @@ def _reranker():
     return CrossEncoder("BAAI/bge-reranker-base")
 
 
-def _full_text_search(query: str) -> list[tuple[Document, float]]:
-    """Keyword search over the chunk ``tsvector`` (needs no embedding call)."""
+def _full_text_search(
+    query: str, corpus_generation: str | None = None
+) -> list[tuple[Document, float]]:
+    """Keyword search over the chunk ``tsvector`` (needs no embedding call).
+
+    When ``corpus_generation`` is given the search is restricted to rows from
+    that generation, so a concurrent rebuild can never fuse full-text hits from
+    one corpus with vector hits from another.
+    """
+    where = "tsv @@ websearch_to_tsquery('english', :q)"
+    params: dict[str, object] = {"q": query, "lim": FTS_LIMIT}
+    if corpus_generation is not None:
+        where += f" AND {VECTOR_GENERATION_COLUMN} = :generation"
+        params["generation"] = corpus_generation
     try:
         with get_engine().connect() as conn:
             rows = conn.execute(
                 text(
-                    "SELECT e.document, e.cmetadata, "
-                    "ts_rank(e.tsv, websearch_to_tsquery('english', :q)) AS score "
-                    "FROM langchain_pg_embedding e "
-                    "JOIN langchain_pg_collection c ON e.collection_id = c.uuid "
-                    "WHERE c.name = :name "
-                    "AND e.tsv @@ websearch_to_tsquery('english', :q) "
+                    f"SELECT content, {VECTOR_METADATA_COLUMN}, "
+                    "ts_rank(tsv, websearch_to_tsquery('english', :q)) AS score "
+                    f"FROM {VECTOR_TABLE} "
+                    f"WHERE {where} "
                     "ORDER BY score DESC LIMIT :lim"
                 ),
-                {
-                    "q": query,
-                    "name": COLLECTION_NAME,
-                    "lim": FTS_LIMIT,
-                },
+                params,
             ).fetchall()
     except Exception as exc:
         # FTS is an enhancement: a missing index/column (fresh DB) must not
@@ -99,16 +110,29 @@ def _full_text_search(query: str) -> list[tuple[Document, float]]:
 
 
 class HybridRetriever(BaseRetriever):
-    """Vector + full-text retriever with Reciprocal Rank Fusion, optional rerank."""
+    """Vector + full-text retriever with Reciprocal Rank Fusion, optional rerank.
+
+    ``corpus_generation`` pins retrieval to one atomically activated corpus
+    generation. When set, both the vector and full-text channels filter on the
+    generation column, so a request can never observe a mixed corpus even if a
+    rebuild commits between the two queries. When ``None`` the retriever behaves
+    as before (search the whole active table).
+    """
 
     vector_top_k: int = VECTOR_TOP_K
     final_k: int = FINAL_K
+    corpus_generation: str | None = None
+
+    def _generation_filter(self) -> dict[str, str] | None:
+        if self.corpus_generation is None:
+            return None
+        return {VECTOR_GENERATION_COLUMN: self.corpus_generation}
 
     def _vector_search(self, query: str) -> list[tuple[Document, float]]:
         from app.db import get_vectorstore
 
         return get_vectorstore().similarity_search_with_score(
-            query, k=self.vector_top_k
+            query, k=self.vector_top_k, filter=self._generation_filter()
         )
 
     def _rerank(self, query: str, docs: list[Document]) -> list[Document]:
@@ -122,8 +146,15 @@ class HybridRetriever(BaseRetriever):
 
     def _get_relevant_documents(self, query: str) -> list[Document]:
         vector_hits = self._vector_search(query)
-        fts_hits = _full_text_search(query)
+        fts_hits = _full_text_search(query, self.corpus_generation)
         fused = rrf_fuse(vector_hits, fts_hits)
         if settings.enable_reranker and len(fused) > 1:
             fused = self._rerank(query, fused[: (self.vector_top_k + FTS_LIMIT)])
-        return fused[: self.final_k]
+        selected = fused[: self.final_k]
+        # The generation document prompt requires explicit provenance fields.
+        # Older vectors may predate data_status, so label them unknown rather
+        # than failing the whole answer chain or inventing a verified status.
+        for doc in selected:
+            doc.metadata.setdefault("source", "unknown")
+            doc.metadata.setdefault("data_status", "unknown")
+        return selected

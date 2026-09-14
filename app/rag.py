@@ -1,10 +1,8 @@
 """Retrieval-augmented generation for SchemeGPT.
 
-Live path (unchanged shape): retrieve context from the pgvector store and answer
-with ChatGroq through the simple LangChain retrieval chain built by
-``build_chain``. Iteration 2 keeps that single chain; only the prompt is
-selected per-language (``en``/``hi``) and a compact, clearly-delimited profile
-block is added as user-provided input when a saved profile is attached.
+Live path: normalize and route the request, retrieve through the shared hybrid
+retriever, then format canonical provenance into an explicit LangChain Core
+prompt/model/parser pipeline.
 
 Fallback path: if the live path is unavailable - missing, invalid or
 rate-limited GROQ_API_KEY, database/retrieval failure, or any ordinary
@@ -19,16 +17,17 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda
 from langchain_groq import ChatGroq
 
 from app import semantic_cache
 from app.catalog import load_scheme_catalog_records
 from app.config import ROOT_DIR, settings
-from app.db import get_vectorstore
+from app.db import get_retriever as get_hybrid_retriever
+from app.quotes import parse_quotes, verify_quotes
 from app.schemas import ProfileData
 from app.tracing import stage_span
 
@@ -319,6 +318,13 @@ def _demo_source(src: dict) -> dict:
     }
     record = _demo_source_metadata_lookup().get(Path(source_name).name)
     if record:
+        source_file = str(record.get("source_file") or "")
+        if source_file:
+            source_path = Path(source_file)
+            try:
+                base["source"] = source_path.relative_to("data").as_posix()
+            except ValueError:
+                base["source"] = source_path.as_posix()
         base["jurisdiction"] = record.get("jurisdiction")
         if record.get("type") in ("state", "union_territory"):
             base["state"] = record.get("name")
@@ -453,13 +459,81 @@ def _build_profile_context(profile: ProfileData | None, language: str) -> str:
     return "<profile>\n" + "\n".join(lines) + "\n" + instruction + "\n</profile>"
 
 
-def get_retriever():
-    """Vector-store retriever used by both /query and /query/stream."""
-    return get_vectorstore().as_retriever()
+def get_retriever(corpus_generation: str | None = None):
+    """Hybrid vector + full-text retriever shared by sync and SSE queries.
+
+    ``corpus_generation`` pins retrieval to the request's captured generation.
+    """
+    if corpus_generation is None:
+        return get_hybrid_retriever()
+    return get_hybrid_retriever(corpus_generation)
+
+
+def _needs_multi_step(question: str, profile: ProfileData | None) -> bool:
+    # Lazy import avoids app.agent -> app.rag prompt imports forming a cycle.
+    from app.agent import needs_multi_step
+
+    return needs_multi_step(question, profile)
+
+
+def _run_agent_gather(
+    question: str,
+    language: str,
+    profile: ProfileData | None,
+    corpus_generation: str | None = None,
+):
+    from app.agent import run_agent_gather
+
+    return run_agent_gather(
+        question, language, profile, corpus_generation=corpus_generation
+    )
+
+
+def retrieve_context(
+    question: str,
+    language: str = "en",
+    profile: ProfileData | None = None,
+    corpus_generation: str | None = None,
+):
+    """Shared normalize/route/hybrid-retrieve pipeline for JSON and SSE APIs.
+
+    ``corpus_generation`` pins both the agentic and single-shot retrievers to
+    the caller's captured generation so retrieval cannot mix corpus generations.
+    A missing generation fails closed: an unbound retrieval could fuse rows from
+    two corpora, so it is never attempted.
+    """
+    if not corpus_generation:
+        raise RuntimeError(
+            "retrieve_context requires a known corpus generation; "
+            "refusing an unbound retrieval."
+        )
+    lang = _normalize_language(language)
+    if _needs_multi_step(question, profile):
+        try:
+            return _run_agent_gather(question, lang, profile, corpus_generation)
+        except Exception as exc:
+            logger.warning(
+                "Agent retrieval failed (%s); using single-shot hybrid retrieval.",
+                type(exc).__name__,
+            )
+    normalized = normalize_question(question)
+    return get_retriever(corpus_generation).invoke(normalized), []
+
+
+def _format_documents(docs) -> str:
+    """Render retrieved policy text with exact provenance for the model."""
+    return "\n\n".join(
+        "Source: {source}\nData status: {status}\nPolicy text:\n{text}".format(
+            source=doc.metadata.get("source", "unknown"),
+            status=doc.metadata.get("data_status", "unknown"),
+            text=doc.page_content,
+        )
+        for doc in docs
+    )
 
 
 def build_answer_chain(language: str = "en"):
-    """Stuff-documents chain (prompt + LLM) for a language, no retrieval."""
+    """Explicit LCEL prompt + model chain for already-retrieved documents."""
     lang = _normalize_language(language)
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -467,14 +541,11 @@ def build_answer_chain(language: str = "en"):
             ("human", HUMAN_TEMPLATE),
         ]
     )
-    return create_stuff_documents_chain(get_llm(), prompt)
 
+    def prepare(values: dict) -> dict:
+        return {**values, "context": _format_documents(values.get("context", []))}
 
-@lru_cache
-def build_chain(language: str = "en"):
-    """Build the LangChain retrieval chain for a language (cached per language)."""
-    lang = _normalize_language(language)
-    return create_retrieval_chain(get_retriever(), build_answer_chain(lang))
+    return RunnableLambda(prepare) | prompt | get_llm() | StrOutputParser()
 
 
 def answer(
@@ -496,20 +567,50 @@ def answer(
     """
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
+    if not settings.groq_api_key.strip():
+        return demo_answer(question, lang)
     ph = semantic_cache.profile_hash(profile)
+    # Capture the corpus generation once and carry it through lookup, retrieval,
+    # and store so a concurrent rebuild cannot make one request mix generations.
+    # An unknown generation fails closed: the cache is skipped and no unbound
+    # live retrieval is attempted, so the labelled demo answer is returned.
+    try:
+        generation = semantic_cache.capture_generation()
+    except Exception as exc:
+        logger.error(
+            "Corpus generation metadata unavailable (%s); returning demo answer.",
+            type(exc).__name__,
+        )
+        return demo_answer(question, lang)
+    if not generation:
+        logger.error(
+            "Corpus generation is uninitialized; disabling cache and live "
+            "retrieval and returning demo answer."
+        )
+        return demo_answer(question, lang)
     with stage_span("cache_lookup") as span:
-        cached = semantic_cache.lookup(question, lang, ph)
+        cached = semantic_cache.lookup(question, lang, ph, generation)
         if span is not None:
             span.set_attribute("cache.hit", cached is not None)
     if cached is not None:
-        return {**cached, "cached": True}
+        validated = semantic_cache.revalidate_payload(cached)
+        return {**validated, "cached": True}
     try:
         usage = TokenUsageHandler()
-        with stage_span("rag_chain") as span:
-            result = build_chain(lang).invoke(
-                {"input": question, "profile_context": profile_context},
+        with stage_span("retrieve") as span:
+            docs, steps = retrieve_context(question, lang, profile, generation)
+            if span is not None:
+                span.set_attribute("docs.count", len(docs))
+        with stage_span("generate") as span:
+            generated = build_answer_chain(lang).invoke(
+                {
+                    "context": docs,
+                    "input": question,
+                    "profile_context": profile_context,
+                },
                 config={"callbacks": [usage]},
             )
+            answer_text = generated if isinstance(generated, str) else str(generated)
             if span is not None:
                 span.set_attribute(
                     "tokens.total", usage.prompt_tokens + usage.completion_tokens
@@ -536,13 +637,16 @@ def answer(
             "last_verified": doc.metadata.get("last_verified"),
             "source_url": doc.metadata.get("source_url"),
         }
-        for doc in result.get("context", [])
+        for doc in docs
     ]
+    verified_quotes = verify_quotes(parse_quotes(answer_text), sources)
     payload = {
-        "answer": result.get("answer", ""),
+        "answer": answer_text,
         "sources": sources,
+        "quotes": [quote.__dict__ for quote in verified_quotes],
+        "steps": steps,
         "mode": "live",
         "language": lang,
     }
-    semantic_cache.store(question, lang, ph, payload)
+    semantic_cache.store(question, lang, ph, payload, generation)
     return payload

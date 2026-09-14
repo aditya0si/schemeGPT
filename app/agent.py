@@ -14,16 +14,11 @@ pretest, not an LLM call). No key/DB is needed when the question is simple.
 
 import json
 import logging
-from pathlib import Path
 
 from langchain_core.documents import Document
 
-from app.catalog import (
-    load_schemes_by_source,
-    load_states_catalog,
-    scheme_name_variants,
-)
-from app.config import ROOT_DIR
+from app.catalog import scheme_name_variants
+from app.db import fetch_generation_documents, fetch_generation_jurisdictions
 from app.rag import SYSTEM_PROMPTS, get_llm
 
 logger = logging.getLogger(__name__)
@@ -90,11 +85,30 @@ def needs_multi_step(question: str, profile=None) -> bool:
     return False
 
 
-def search_schemes(query: str, jurisdiction: str | None = None) -> list[Document]:
-    """Hybrid-retrieve relevant docs, optionally filtered to a jurisdiction."""
+def _require_generation(tool: str, corpus_generation: str | None) -> str:
+    """Every answer-producing tool must be bound to one known generation.
+
+    A tool that cannot be pinned could mix a live filesystem/catalog read with
+    an earlier database generation, so it fails rather than answer unbound.
+    """
+    if not corpus_generation:
+        raise ValueError(f"{tool} requires a known corpus generation")
+    return corpus_generation
+
+
+def search_schemes(
+    query: str,
+    jurisdiction: str | None = None,
+    corpus_generation: str | None = None,
+) -> list[Document]:
+    """Hybrid-retrieve relevant docs, optionally filtered to a jurisdiction.
+
+    ``corpus_generation`` pins the search to the request's captured generation.
+    """
     from app.retrieval import HybridRetriever
 
-    docs = HybridRetriever().invoke(query)
+    generation = _require_generation("search_schemes", corpus_generation)
+    docs = HybridRetriever(corpus_generation=generation).invoke(query)
     if jurisdiction:
         narrowed = [
             d for d in docs
@@ -104,44 +118,61 @@ def search_schemes(query: str, jurisdiction: str | None = None) -> list[Document
     return docs
 
 
-def get_scheme_details(scheme_id: str) -> list[Document]:
-    """Return the recorded details of one scheme as a document."""
-    records = load_schemes_by_source()
-    for source, record in records.items():
-        if scheme_id in source or source.endswith(scheme_id):
-            rel = source[5:] if source.startswith("data/") else source
-            path = ROOT_DIR / "data" / rel
-            text = path.read_text(encoding="utf-8") if path.exists() else ""
-            return [
-                Document(
-                    page_content=text[:1500],
-                    metadata={
-                        "source": source,
-                        "data_status": record.get("data_status"),
-                        "jurisdiction": record.get("jurisdiction"),
-                    },
-                )
-            ]
+def get_scheme_details(
+    scheme_id: str, corpus_generation: str | None = None
+) -> list[Document]:
+    """Return the recorded details of one scheme from the pinned corpus.
+
+    Sourced only from the generation-pinned vector table (never the live
+    filesystem/catalog), so an edited or deleted local Markdown file cannot be
+    mixed into an answer bound to an earlier generation.
+    """
+    generation = _require_generation("get_scheme_details", corpus_generation)
+    records = fetch_generation_documents(generation, source=scheme_id)
+    if not records:
+        return [
+            Document(
+                page_content=f"No scheme found for id '{scheme_id}'.",
+                metadata={"source": scheme_id, "corpus_generation": generation},
+            )
+        ]
+    content = "\n\n".join(
+        str(record.get("content") or "") for record in records
+    )
+    metadata = dict(records[0].get("metadata") or {})
+    metadata.setdefault("source", scheme_id)
+    metadata["corpus_generation"] = generation
+    return [Document(page_content=content[:2000], metadata=metadata)]
+
+
+def list_jurisdictions(corpus_generation: str | None = None) -> list[Document]:
+    """Jurisdictions present in the pinned corpus, not the static catalog."""
+    generation = _require_generation("list_jurisdictions", corpus_generation)
+    names = ", ".join(fetch_generation_jurisdictions(generation))
     return [
         Document(
-            page_content=f"No scheme found for id '{scheme_id}'.",
-            metadata={"source": scheme_id},
+            page_content=f"Covered jurisdictions: {names}",
+            metadata={"source": "jurisdictions", "corpus_generation": generation},
         )
     ]
 
 
-def list_jurisdictions() -> list[Document]:
-    names = ", ".join(str(r.get("name")) for r in load_states_catalog() if r.get("name"))
-    return [
-        Document(page_content=f"Covered jurisdictions: {names}", metadata={"source": "jurisdictions"})
-    ]
+def _tool_map(corpus_generation: str) -> dict:
+    generation = _require_generation("agent tools", corpus_generation)
 
+    def _search(query: str, jurisdiction: str | None = None) -> list[Document]:
+        return search_schemes(query, jurisdiction, generation)
 
-def _tool_map() -> dict:
+    def _details(scheme_id: str) -> list[Document]:
+        return get_scheme_details(scheme_id, generation)
+
+    def _jurisdictions() -> list[Document]:
+        return list_jurisdictions(generation)
+
     return {
-        "search_schemes": search_schemes,
-        "get_scheme_details": get_scheme_details,
-        "list_jurisdictions": list_jurisdictions,
+        "search_schemes": _search,
+        "get_scheme_details": _details,
+        "list_jurisdictions": _jurisdictions,
     }
 
 
@@ -155,6 +186,7 @@ def run_agent_gather(
     language: str = "en",
     profile=None,
     max_steps: int = MAX_STEPS,
+    corpus_generation: str | None = None,
 ) -> tuple[list[Document], list[dict]]:
     """Tool-calling loop that gathers context documents + auditable steps.
 
@@ -162,14 +194,21 @@ def run_agent_gather(
     context and ``steps`` records each tool call for the UI. Any failure before
     a final answer is raised; the caller should degrade to single-shot
     retrieval (never silently answer from an empty context).
+
+    Every tool is bound to ``corpus_generation`` and every context document is
+    read from that generation-pinned corpus, so agentic answers cannot mix a
+    changed local file or catalog with an earlier database generation. A missing
+    generation raises instead of running unbound tools.
     """
     lang = "hi" if str(language).strip().lower() == "hi" else "en"
+    # Validate generation binding before any provider call: an unbound agent
+    # must fail closed, not answer from mixed corpora.
+    tool_map = _tool_map(corpus_generation)
     model = get_llm().bind_tools(TOOLS)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPTS[lang]},
         {"role": "user", "content": question},
     ]
-    tool_map = _tool_map()
     docs: list[Document] = []
     steps: list[dict] = []
     seen: set[tuple] = set()

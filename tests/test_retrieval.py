@@ -39,9 +39,11 @@ def test_rrf_dedupes_identical_docs_across_channels():
     assert len(ranked) == 1
 
 
-def _fake_vectorstore(hits):
+def _fake_vectorstore(hits, seen=None):
     class FakeStore:
-        def similarity_search_with_score(self, query, k):
+        def similarity_search_with_score(self, query, k, filter=None):
+            if seen is not None:
+                seen.append(filter)
             return hits[:k]
 
     return FakeStore()
@@ -96,3 +98,39 @@ def test_hybrid_retriever_returns_fused_top_k():
     # the 3 unique docs; d3 is present via vector search alone).
     assert len(docs) == 3
     assert {d.page_content for d in docs} == {"one", "two", "three"}
+    assert all(d.metadata["data_status"] == "unknown" for d in docs)
+
+
+def test_hybrid_retriever_filters_both_channels_to_bound_generation():
+    d1 = _doc("one")
+    seen_filters = []
+    fake_engine = _fake_engine([(d1.page_content, {"source": "s"}, 1.0)])
+    with (
+        patch("app.db.get_vectorstore",
+              return_value=_fake_vectorstore([(d1, 0.9)], seen_filters)),
+        patch("app.retrieval.get_engine", return_value=fake_engine),
+        patch("app.retrieval.settings") as fake_settings,
+    ):
+        fake_settings.enable_reranker = False
+        docs = HybridRetriever(corpus_generation="gen-a").invoke("q")
+
+    assert seen_filters == [{"corpus_generation": "gen-a"}]
+    assert fake_engine.conn.fetched["generation"] == "gen-a"
+    assert docs
+
+
+def test_hybrid_retriever_without_generation_stays_unfiltered():
+    d1 = _doc("one")
+    seen_filters = []
+    fake_engine = _fake_engine([(d1.page_content, {"source": "s"}, 1.0)])
+    with (
+        patch("app.db.get_vectorstore",
+              return_value=_fake_vectorstore([(d1, 0.9)], seen_filters)),
+        patch("app.retrieval.get_engine", return_value=fake_engine),
+        patch("app.retrieval.settings") as fake_settings,
+    ):
+        fake_settings.enable_reranker = False
+        HybridRetriever().invoke("q")
+
+    assert seen_filters == [None]
+    assert "generation" not in fake_engine.conn.fetched
