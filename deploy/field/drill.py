@@ -53,6 +53,7 @@ BROKEN_VERSION = "v2.0.1"
 
 DRY_RUN = False
 LOG_LINES: list[str] = []
+_SHELL: str | None = None  # resolved once by field_shell()
 
 
 def log(message: str) -> None:
@@ -61,7 +62,95 @@ def log(message: str) -> None:
     LOG_LINES.append(line)
 
 
+def _shell_candidates() -> list[str]:
+    """Every plausible bash on this host, most-trusted first.
+
+    ``bash`` on PATH is not enough: on Windows it is usually
+    ``C:\\Windows\\System32\\bash.exe`` (the WSL launcher), while the MSYS
+    git-bash that Docker Desktop's CLI works under lives in the Git install
+    directory. System32 is filtered out on purpose — it is the one candidate
+    known to be wrong.
+    """
+    import shutil as _shutil
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+
+    def add(path: str | None) -> None:
+        if path and path not in seen:
+            seen.add(path)
+            ordered.append(path)
+
+    add(os.environ.get("SCHEMEGPT_BASH", ""))
+    exepath = os.environ.get("EXEPATH", "")
+    if exepath:
+        add(os.path.join(exepath, "bin", "bash.exe"))
+        add(os.path.join(exepath, "usr", "bin", "bash.exe"))
+    for name in ("bash.exe", "bash"):
+        found = _shutil.which(name)
+        if found and "system32" not in found.lower():
+            add(found)
+    for base in (
+        os.environ.get("ProgramFiles", ""),
+        os.environ.get("ProgramFiles(x86)", ""),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+    ):
+        if base:
+            add(os.path.join(base, "Git", "bin", "bash.exe"))
+            add(os.path.join(base, "Git", "usr", "bin", "bash.exe"))
+    add("/usr/bin/bash")
+    add("/bin/bash")
+    return ordered
+
+
+def field_shell() -> str:
+    """Pick a shell whose ``docker`` actually works, once per process.
+
+    On Windows, ``bash`` on PATH is frequently ``C:\\Windows\\System32\\bash.exe``
+    — the WSL launcher, not git-bash. WSL bash finds the Windows docker shim under
+    ``/mnt/c``, and that shim refuses to run unless Docker Desktop's WSL
+    integration is enabled, printing "The command 'docker' could not be found in
+    this WSL 2 distro". Every field script then fails in a way that blames the
+    wrong thing (an image check reports "not present" when docker never ran), so
+    each candidate is probed for a working docker before any of them is trusted
+    with a deployment.
+
+    Override with ``SCHEMEGPT_BASH`` when a deployment has a specific bash.
+    """
+    global _SHELL
+    if _SHELL:
+        return _SHELL
+    tried: list[str] = []
+    for candidate in _shell_candidates():
+        try:
+            probe = subprocess.run(
+                [candidate, "-c", "docker info --format '{{.ServerVersion}}'"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
+        except Exception as exc:
+            tried.append(f"{candidate} ({type(exc).__name__})")
+            continue
+        if probe.returncode == 0 and probe.stdout.strip():
+            log(f"field shell: {candidate} (docker {probe.stdout.strip()})")
+            _SHELL = candidate
+            return _SHELL
+        tried.append(f"{candidate} (docker unusable: {(probe.stdout + probe.stderr).strip()[:160]})")
+    raise RuntimeError(
+        "no shell on this host can reach the docker daemon, so the field scripts "
+        "cannot run. Tried: " + "; ".join(tried) + ". On Windows this usually means "
+        "'bash' resolves to the WSL launcher while Docker Desktop's WSL integration "
+        "is off: set SCHEMEGPT_BASH to your git-bash (find it with "
+        "`cygpath -w /usr/bin/bash` inside git-bash) or enable the integration."
+    )
+
+
 def run(argv: list[str], check: bool = True, timeout: int = 1800) -> subprocess.CompletedProcess:
+    argv = list(argv)
+    if argv and argv[0] == "bash":
+        # Never hand a field script to an arbitrary `bash`; use the probed one.
+        argv[0] = field_shell()
     log(f"$ {' '.join(argv)}")
     if DRY_RUN:
         return subprocess.CompletedProcess(argv, 0, "", "")

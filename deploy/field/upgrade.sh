@@ -41,8 +41,8 @@ done
 
 [ -n "${TO_VERSION}" ] || die "--to-version is required (e.g. --to-version v2.0.0)."
 [ -n "${TO_IMAGE}" ] || TO_IMAGE="schemegpt-api:${TO_VERSION}"
-docker image inspect "${TO_IMAGE}" >/dev/null 2>&1 || \
-  die "image ${TO_IMAGE} is not present locally. Load the bundle or build it first."
+docker_image_present "${TO_IMAGE}" || \
+  die "image ${TO_IMAGE} is not present locally. docker said: ${DOCKER_ERROR}. Load the bundle or build it first."
 
 FROM_VERSION="$(read_state_field version)"
 FROM_IMAGE="$(read_state_field image)"

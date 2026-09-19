@@ -48,8 +48,8 @@ if [ -z "${TO_VERSION}" ]; then
   die "no rollback target: pass --to-version (the deploy state has no previous_version)."
 fi
 [ -n "${TO_IMAGE}" ] || TO_IMAGE="schemegpt-api:${TO_VERSION}"
-docker image inspect "${TO_IMAGE}" >/dev/null 2>&1 || \
-  die "target image ${TO_IMAGE} is not present locally; load it before rolling back."
+docker_image_present "${TO_IMAGE}" || \
+  die "target image ${TO_IMAGE} is not available to docker (docker said: ${DOCKER_ERROR}); load it before rolling back."
 
 STARTED_AT="$(now_utc)"
 log "Rollback: ${CURRENT_VERSION:-unknown} -> ${TO_VERSION} (${TO_IMAGE})"

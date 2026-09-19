@@ -243,6 +243,24 @@ print("" if value is None else value)
 PY
 }
 
+docker_image_present() {
+  # docker_image_present <image> -> 0 when the daemon has it; otherwise 1 with
+  # docker's own message in DOCKER_ERROR.
+  #
+  # This exists because `docker image inspect X >/dev/null 2>&1 || die "not
+  # present"` is a lie when docker never ran: a broken CLI, an unreachable
+  # daemon or (on Windows) a bash that cannot see Docker Desktop's pipe all
+  # produce the same "not present" verdict. In the field that sends you to
+  # rebuild an image that was already there. Keep the tool's own words.
+  local image="$1" message
+  if message="$(docker image inspect "${image}" 2>&1 >/dev/null)"; then
+    DOCKER_ERROR=""
+    return 0
+  fi
+  DOCKER_ERROR="${message:-no output from docker}"
+  return 1
+}
+
 set_api_image() {
   # set_api_image <image_ref> — pin the API image for compose substitution.
   # Written to state/deploy.env (not .env): deployment pinning is this kit's
