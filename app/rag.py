@@ -755,6 +755,27 @@ def answer(
     """
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
+
+    # No key configured at all: this is a demo instance. Unchanged behaviour —
+    # labelled pre-made answers, no provider call, no breaker accounting.
+    if not settings.groq_api_key.strip():
+        return demo_answer(question, lang)
+
+    # Operator state is consulted exactly once per request, and the two refusal
+    # reasons deliberately behave differently:
+    #
+    #   kill_switch — a human stopped generation, usually because they doubt
+    #     what the model has been producing. Generated text must therefore not
+    #     be served at all, including live answers already sitting in the
+    #     semantic cache: replaying them would keep serving the very output the
+    #     operator distrusted, and would make the switch unobservable.
+    #   breaker — the provider is failing. That is an availability problem, not
+    #     a trust problem, so a cached live answer is still the best answer
+    #     available and is served; only new generation stops.
+    gate = operator.gate()
+    if gate == "kill_switch":
+        return fallback_answer(question, lang, profile, reason=gate)
+
     ph = semantic_cache.profile_hash(profile)
     with stage_span("cache_lookup") as span:
         cached = semantic_cache.lookup(question, lang, ph)
@@ -763,15 +784,7 @@ def answer(
     if cached is not None:
         return {**cached, "cached": True}
 
-    # No key configured at all: this is a demo instance. Unchanged behaviour —
-    # labelled pre-made answers, no provider call, no breaker accounting.
-    if not settings.groq_api_key.strip():
-        return demo_answer(question, lang)
-
-    # Operator controls. The kill switch and the provider circuit breaker both
-    # short-circuit to a retrieval-only answer instead of a generated one.
-    gate = operator.gate()
-    if gate != "ok":
+    if gate == "breaker":
         return fallback_answer(question, lang, profile, reason=gate)
 
     try:

@@ -105,6 +105,18 @@ async def stream_answer(
     try:
         # Fail fast (no key -> ValueError) before touching the DB.
         get_llm()
+        # Operator state, consulted once. The kill switch bypasses the semantic
+        # cache (stop serving generated text, not just stop generating it) while
+        # the breaker does not (an availability problem should still be able to
+        # answer from cache). See app/rag.answer for the full reasoning.
+        gate = operator.gate()
+        if gate == "kill_switch":
+            payload = await anyio.to_thread.run_sync(
+                lambda: fallback_answer(question, lang, profile, reason=gate)
+            )
+            async for event in _stream_fallback(payload, lang):
+                yield event
+            return
         # Semantic cache: serve a stored live answer for a semantically equal
         # question (same language + profile) with the identical event shape.
         ph = semantic_cache.profile_hash(profile)
@@ -124,11 +136,7 @@ async def stream_answer(
                 {"mode": "live", "notice": None, "language": lang, "cached": True},
             )
             return
-        # Operator controls: the kill switch and the provider circuit breaker
-        # both short-circuit to the retrieval-only answer, streamed with the
-        # same event shape so the client needs no special case.
-        gate = operator.gate()
-        if gate != "ok":
+        if gate == "breaker":
             payload = await anyio.to_thread.run_sync(
                 lambda: fallback_answer(question, lang, profile, reason=gate)
             )

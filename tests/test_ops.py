@@ -387,6 +387,75 @@ def test_fallback_answer_uses_demo_when_retrieval_fails(monkeypatch, tmp_path):
     assert controller.ai_enabled is True
 
 
+# --- operator state vs the semantic cache -------------------------------------
+# The two refusal reasons deliberately differ. A human stopping generation must
+# stop *serving* generated text, so a cached live answer is not replayed; a
+# failing provider is an availability problem, so a cached answer is still the
+# best answer available. Both are asserted here because the difference is a
+# product decision, not an implementation detail.
+
+
+def test_kill_switch_bypasses_the_semantic_cache(degraded_setup, monkeypatch):
+    rag, _controller = degraded_setup
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "groq_api_key", "test-key-not-used")
+    cached_live = {
+        "answer": "generated text that a human may distrust",
+        "sources": [],
+        "mode": "live",
+        "language": "en",
+    }
+    lookups = {"count": 0}
+
+    def counting_lookup(*_args, **_kwargs):
+        lookups["count"] += 1
+        return cached_live
+
+    monkeypatch.setattr(rag.semantic_cache, "lookup", counting_lookup)
+    payload = rag.answer("How much does PM-KISAN pay a farmer family?")
+
+    assert payload["mode"] == "degraded"
+    assert lookups["count"] == 0, "the cache must not even be consulted while generation is stopped"
+
+
+def test_breaker_still_serves_cached_answers(degraded_setup, monkeypatch):
+    rag, controller = degraded_setup
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "groq_api_key", "test-key-not-used")
+    controller.enable_ai(actor="pytest")  # undo the fixture's kill switch
+    for _ in range(controller.breaker.failure_threshold):
+        controller.breaker.record_failure("Timeout")
+    assert controller.breaker.state == OPEN
+
+    cached_live = {
+        "answer": "previously generated and verified answer",
+        "sources": [],
+        "mode": "live",
+        "language": "en",
+    }
+    monkeypatch.setattr(rag.semantic_cache, "lookup", lambda *_a, **_k: cached_live)
+    payload = rag.answer("How much does PM-KISAN pay a farmer family?")
+
+    assert payload["mode"] == "live"
+    assert payload.get("cached") is True
+
+
+def test_breaker_without_cache_serves_retrieval_only(degraded_setup, monkeypatch):
+    rag, controller = degraded_setup
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "groq_api_key", "test-key-not-used")
+    controller.enable_ai(actor="pytest")
+    for _ in range(controller.breaker.failure_threshold):
+        controller.breaker.record_failure("Timeout")
+    monkeypatch.setattr(rag.semantic_cache, "lookup", lambda *_a, **_k: None)
+    payload = rag.answer("How much does PM-KISAN pay a farmer family?")
+
+    assert payload["mode"] == "degraded"
+
+
 # --- HTTP surface ------------------------------------------------------------
 
 

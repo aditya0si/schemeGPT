@@ -222,11 +222,41 @@ def admin_headers() -> dict:
     return {"X-Admin-Token": os.environ.get("SCHEMEGPT_ADMIN_TOKEN", "")}
 
 
-def unique_question(base: str = "How much income support does PM-KISAN provide") -> str:
-    """Every drill call asks something new: the semantic cache would otherwise
-    answer the second identical question from the first one, hiding the outage."""
-    nonce = "".join(random.choices(string.ascii_lowercase, k=6))
-    return f"{base} ({nonce})?"
+QUESTION_POOL = (
+    "How much income support does PM-KISAN provide to a farmer family?",
+    "What is the PM-KISAN instalment schedule and how many payments are there?",
+    "Which documents are needed for eKYC on the PM-KISAN portal?",
+    "What is the eligibility income limit for Ayushman Bharat coverage?",
+    "How does a family apply for PM-JAY at an empanelled hospital?",
+    "What benefits does the Atal Pension Yojana offer to informal workers?",
+    "How many years must a subscriber contribute to the Atal Pension Yojana?",
+    "What is the premium structure of the Pradhan Mantri Jeevan Jyoti Bima Yojana?",
+    "What accident cover does the Pradhan Mantri Suraksha Bima Yojana give?",
+    "Which state schemes provide maternity benefit for a rural household?",
+    "How is the widow pension scheme applied for in Uttar Pradesh?",
+    "What scholarship schemes exist for scheduled caste students?",
+)
+_pool_index = 0
+
+
+def unique_question(base: str | None = None) -> str:
+    """A genuinely different question on every call.
+
+    A nonce suffix is not enough: the semantic cache serves a stored live answer
+    for a *semantically* similar question (cosine >= 0.95, same language and
+    profile), and "…PM-KISAN provide (abc123)?" and "…(def456)?" are the same
+    question to an embedding. Probing an outage with near-duplicates would
+    measure the cache instead of the outage. The drill also disables the cache
+    for the duration of the rehearsal (see main), so this pool is belt and
+    braces against wraparound on a long run.
+    """
+    global _pool_index
+    if base:
+        nonce = "".join(random.choices(string.ascii_lowercase, k=6))
+        return f"{base} ({nonce})?"
+    question = QUESTION_POOL[_pool_index % len(QUESTION_POOL)]
+    _pool_index += 1
+    return question
 
 
 def ask(mode: str = "en") -> dict:
@@ -487,7 +517,11 @@ def phase_install_baseline(report: dict) -> None:
             "  git stash && docker build -t schemegpt:v1.0.0 . && git stash pop"
         )
     set_pinned_image(f"schemegpt:{BASELINE_VERSION}")
-    compose("up", "-d", "--no-build", "db", "api")
+    # --force-recreate: the rehearsal just wrote settings into .env (for example
+    # the semantic cache disable), and compose only recreates a container when it
+    # sees the configuration change. Recreating unconditionally makes the
+    # baseline deterministic instead of dependent on compose's diffing.
+    compose("up", "-d", "--no-build", "--force-recreate", "db", "api")
     health_seconds = wait_healthy(timeout=1500)
     status, ops = http("GET", "/ops/status")
     smoke = ask()
@@ -994,6 +1028,13 @@ def main() -> int:
             print(f"FATAL: {env_file()} not found; install the stack first.", file=sys.stderr)
             return 2
         ensure_admin_token()
+        # Rehearsal setting, not a production default: the semantic cache serves
+        # a stored live answer for a semantically similar question, which would
+        # make an outage or a kill switch look like a success. Every probe must
+        # reach the generation path. Restored when the drill ends.
+        original_cache_setting = read_env().get("ENABLE_SEMANTIC_CACHE", "")
+        set_env("ENABLE_SEMANTIC_CACHE", "false")
+        log("Semantic cache disabled for the rehearsal (restored when it finishes)")
 
     report: dict = {}
     stub = Stub()
@@ -1032,6 +1073,9 @@ def main() -> int:
             headers = admin_headers()
             http("POST", "/ops/ai", {"enabled": True, "actor": "drill.py"}, headers=headers)
             http("POST", "/ops/provider", {"base_url": "", "actor": "drill.py"}, headers=headers)
+            set_env("ENABLE_SEMANTIC_CACHE", original_cache_setting or "true")
+            log("Drill finished: generation re-enabled, endpoint override cleared, "
+                "semantic cache restored")
 
     report["duration_s"] = round(time.time() - started, 2)
     md_path = write_evidence(report)
