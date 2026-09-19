@@ -844,6 +844,11 @@ def phase_no_egress(report: dict, stub: Stub) -> None:
         "quotes": quotes,
         "stream_done_mode": (streamed.get("done") or {}).get("mode"),
         "recovered_mode": final["mode"],
+        "recovered_note": (
+            "probed immediately after the endpoint override was cleared; the "
+            "breaker is usually still cooling down at that moment, so 'degraded' "
+            "here is the cooldown, not a stuck state"
+        ),
     }
     # Assert on the HTTP status, not just the answer mode: an earlier version of
     # this phase recorded four non-answers (mode None, zero sources) and still
@@ -982,7 +987,8 @@ def write_evidence(report: dict) -> Path:
             f"- retrieval still returned {f_block['sources_returned']} sources; "
             f"citations verified {f_block['quotes']['verified']}/{f_block['quotes']['cited']}\n"
             f"- SSE `done.mode = {f_block['stream_done_mode']}`; "
-            f"after the provider returned: `{f_block['recovered_mode']}`\n"
+            f"immediately after the override was cleared: `{f_block['recovered_mode']}` "
+            f"({f_block.get('recovered_note', '')})\n"
         )
     g = report.get("G_preflight_airgap")
     if g:

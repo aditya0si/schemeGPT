@@ -103,6 +103,35 @@ quotes in it were verified".
 three languages" is a claim about those cases, not about the corpus. The CI gate
 is what stops it drifting.
 
+### Measured on a real deployment, not estimated
+
+From `deploy/field/drill.py` against a Docker Compose stack — a release that
+predates the operator control plane being upgraded, broken and rolled back, then
+put under provider failure and total loss of egress. Raw JSON in
+`deploy/field/reports/`, summary in `docs/evidence/FIELD-DRILL.md`.
+
+| What | Measured | What it buys you in the room |
+| --- | --- | --- |
+| Install the previous release | healthy in **6.06s** | the baseline is a genuinely older build: `/ops/status` → 404 |
+| Upgrade to this release | exit 0 in **65.36s** | snapshot → pin → recreate → gate → smoke → recorded |
+| Broken release | exit 1 after **196.32s**, auto-rolled back, API answering `live` | the gate protects the deployment, and the rollback restores image *and* configuration |
+| Kill switch → degraded answers | **0.16s** per answer, 4 sources, citations verified **3/3** | the service stays useful and honest with generation off |
+| Kill switch survives a restart | still `disabled`, answers still `degraded`, healthy in **5.07s** | a switch that a redeploy silently undoes is not a switch |
+| Circuit breaker opens | **2.32s** into sustained 429s | a provider that is already failing stops receiving requests almost immediately |
+| Requests not wasted while open | **16 rejected** | the breaker is an action, not a dashboard |
+| Recovery after the provider heals | **28.75s** | cooldown plus one successful probe |
+| No egress at all | HTTP 200 ×4, all `degraded`, first answer **21.9s**, citations **3/3** | with no route to any provider, the product still answers from its own corpus |
+| Air-gap preflight | `GO`, **0 blockers** | the host report you hand the customer |
+
+The most useful number in that table is one that is no longer there. The first
+no-egress rehearsal recorded **four non-answers** and each request hung for about
+**150 seconds**, because the model client inherited the SDK's defaults: no
+timeout, two retries with backoff. A provider that accepted the connection and
+then went silent left a citizen waiting two and a half minutes. The client is now
+bounded (20s timeout, no retries), which is why that row reads 21.9s — and why
+the breaker now opens in 2.32s instead of 122s. A helpdesk answer that takes two
+and a half minutes is worse than a degraded answer that takes twenty seconds.
+
 ---
 
 ## 4. Decisions and the alternatives that were rejected

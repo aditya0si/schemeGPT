@@ -230,6 +230,13 @@ customer's staging host.
 - The default provider is Groq's free tier: **8k tokens/minute**, which bounds
   throughput per instance. A pilot sized above that needs a paid tier or a
   second endpoint via `/ops/provider`.
+- The model call is bounded at `GROQ_TIMEOUT_S` (default 20s) with
+  `GROQ_MAX_RETRIES` (default 0), so a silent provider costs one bounded wait and
+  then the answer degrades to retrieval-only. That bound is measured, not
+  theoretical: without it the no-egress rehearsal recorded requests hanging for
+  about 150s (see `docs/evidence/FIELD-DRILL.md`). If your provider is slow
+  rather than dead, raise the timeout — but raise it deliberately, and watch the
+  breaker counters while you do.
 - Answers are grounded **only** in the ingested corpus. If a scheme is not in
   the corpus the system says so; it does not guess, and it is not a legal or
   eligibility authority.
