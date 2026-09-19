@@ -74,7 +74,7 @@ else
 fi
 
 set_api_image "${TO_IMAGE}"
-compose up -d --no-build
+compose_up_core
 
 if ! HEALTH_SECONDS="$(wait_for_health "${WAIT_SECONDS}")"; then
   RECORD="$(deploy_record rollback_failed "{\"from_version\": \"${CURRENT_VERSION}\", \"to_version\": \"${TO_VERSION}\", \"to_image\": \"${TO_IMAGE}\", \"restored_db\": \"${RESTORE_DB}\", \"started_at\": \"${STARTED_AT}\"}")"

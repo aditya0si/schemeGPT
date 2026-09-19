@@ -84,6 +84,17 @@ def run(argv: list[str], check: bool = True, timeout: int = 1800) -> subprocess.
     return result
 
 
+def sh_script(script: Path) -> str:
+    """Repo-relative POSIX path for handing a shell script to bash.
+
+    An absolute Windows path is mangled by the MSYS runtime (backslashes are
+    eaten, and the interpreter ends up looking for a file called
+    ``C:Users...``), so shell scripts are always addressed relative to the
+    repository root with forward slashes.
+    """
+    return script.relative_to(REPO_ROOT).as_posix()
+
+
 # --- HTTP helpers ------------------------------------------------------------
 
 
@@ -308,7 +319,30 @@ def ensure_admin_token() -> str:
 
 
 def pinned_image() -> str:
-    return read_env().get("SCHEMEGPT_API_IMAGE", "")
+    """Read the image pin written by lib.sh into state/deploy.env."""
+    path = FIELD_DIR / "state" / "deploy.env"
+    if not path.exists():
+        return ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("SCHEMEGPT_API_IMAGE="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+def set_pinned_image(reference: str) -> None:
+    """Pin the API image for compose, in the kit's own env file (never .env)."""
+    state_dir = FIELD_DIR / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    path = state_dir / "deploy.env"
+    lines = []
+    if path.exists():
+        lines = [
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if not line.strip().startswith("SCHEMEGPT_API_IMAGE=")
+        ]
+    lines.append(f"SCHEMEGPT_API_IMAGE={reference}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def image_exists(reference: str) -> bool:
@@ -324,7 +358,18 @@ def image_exists(reference: str) -> bool:
 
 
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return run(["docker", "compose", "-f", str(REPO_ROOT / "docker-compose.yml"), *args], check=check)
+    argv = [
+        "docker",
+        "compose",
+        "-f",
+        str(REPO_ROOT / "docker-compose.yml"),
+        "--env-file",
+        str(REPO_ROOT / ".env"),
+    ]
+    deploy_env = FIELD_DIR / "state" / "deploy.env"
+    if deploy_env.exists():
+        argv += ["--env-file", str(deploy_env)]
+    return run([*argv, *args], check=check)
 
 
 # --- phases ------------------------------------------------------------------
@@ -338,8 +383,8 @@ def phase_install_baseline(report: dict) -> None:
             f"schemegpt:{BASELINE_VERSION} not found. Build it first:\n"
             "  git stash && docker build -t schemegpt:v1.0.0 . && git stash pop"
         )
-    set_env("SCHEMEGPT_API_IMAGE", f"schemegpt:{BASELINE_VERSION}")
-    compose("up", "-d", "--no-build")
+    set_pinned_image(f"schemegpt:{BASELINE_VERSION}")
+    compose("up", "-d", "--no-build", "db", "api")
     health_seconds = wait_healthy(timeout=1500)
     status, ops = http("GET", "/ops/status")
     smoke = ask()
@@ -798,6 +843,21 @@ def main() -> int:
 
     if args.dry_run:
         DRY_RUN = True
+        plan = ", ".join(phases)
+        print("Dry run: no phase will execute, nothing will be written.")
+        print(f"Phases requested: {plan}")
+        for phase, description in (
+            ("A", f"install the baseline release ({BASELINE_VERSION})"),
+            ("B", f"upgrade to {RELEASE_VERSION} (snapshot, health gate, smoke)"),
+            ("C", f"ship a broken release ({BROKEN_VERSION}) and require the auto-rollback"),
+            ("D", "operator kill switch: degrade, survive a restart, restore"),
+            ("E", "provider outage: breaker opens, degraded answers, recovery"),
+            ("F", "no egress at all: retrieval-only answers, citations verified"),
+            ("G", "air-gap host preflight record"),
+        ):
+            marker = "->" if phase in phases else "  "
+            print(f"  {marker} {phase}: {description}")
+        return 0
 
     if not DRY_RUN:
         if not env_file().exists():

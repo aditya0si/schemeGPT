@@ -74,7 +74,7 @@ log "Environment snapshot: ${ENV_SNAPSHOT} (contains secrets; rotated with the b
 
 set_api_image "${TO_IMAGE}"
 log "Recreating the API container on the new image"
-compose up -d --no-build
+compose_up_core
 
 HEALTH_SECONDS=""
 if ! HEALTH_SECONDS="$(wait_for_health "${WAIT_SECONDS}")"; then

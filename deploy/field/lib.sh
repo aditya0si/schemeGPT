@@ -52,7 +52,31 @@ detect_python() {
 }
 
 compose() {
-  docker compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" "$@"
+  # Two env files, on purpose:
+  #   .env                 application settings (and secrets) for the containers,
+  #   state/deploy.env     deployment pinning written by this kit (image refs).
+  # Keeping them apart means the app never sees deployment plumbing, and this
+  # kit never rewrites a file that holds customer secrets.
+  local args=(--project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" \
+              --env-file "${REPO_ROOT}/.env")
+  [ -f "${STATE_DIR}/deploy.env" ] && args+=(--env-file "${STATE_DIR}/deploy.env")
+  docker compose "${args[@]}" "$@"
+}
+
+compose_up_core() {
+  # Bring up the services the field kit owns. The web and streamlit frontends
+  # are optional extras (a customer install may not want the demo UI), so they
+  # are never required for an install, an upgrade or a rollback to succeed.
+  compose up -d --no-build "${DB_SERVICE}" "${API_SERVICE}"
+}
+
+compose_up_frontends() {
+  # Best-effort: only services whose images are already present.
+  for service in web streamlit; do
+    if docker image inspect "schemegpt-${service}:latest" >/dev/null 2>&1; then
+      compose up -d --no-build "${service}" || warn "could not start ${service}"
+    fi
+  done
 }
 
 now_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
@@ -199,17 +223,17 @@ PY
 
 set_api_image() {
   # set_api_image <image_ref> — pin the API image for compose substitution.
-  # Kept in .env because that is where compose looks; one managed line, marked
-  # so a human can see who wrote it and why.
-  local image="$1" env_file="${REPO_ROOT}/.env" tmp
-  [ -f "${env_file}" ] || die "no .env at ${env_file}; run install.sh first."
+  # Written to state/deploy.env (not .env): deployment pinning is this kit's
+  # business, the application's env file is not.
+  local image="$1" deploy_env="${STATE_DIR}/deploy.env" tmp
+  mkdir -p "${STATE_DIR}"
   tmp="$(mktemp)"
-  grep -v '^SCHEMEGPT_API_IMAGE=' "${env_file}" > "${tmp}" || true
-  printf '# field kit: pinned by deploy/field/upgrade.sh or rollback.sh\nSCHEMEGPT_API_IMAGE=%s\n' \
-    "${image}" >> "${tmp}"
-  cat "${tmp}" > "${env_file}"
+  [ -f "${deploy_env}" ] && grep -v '^SCHEMEGPT_API_IMAGE=' "${deploy_env}" > "${tmp}" || true
+  printf '# written by the field kit (%s); compose reads this file after .env\nSCHEMEGPT_API_IMAGE=%s\n' \
+    "$(now_utc)" "${image}" >> "${tmp}"
+  cat "${tmp}" > "${deploy_env}"
   rm -f "${tmp}"
-  log "Pinned SCHEMEGPT_API_IMAGE=${image} in $(basename "${env_file}")"
+  log "Pinned SCHEMEGPT_API_IMAGE=${image} in deploy/field/state/deploy.env"
 }
 
 snapshot_db() {

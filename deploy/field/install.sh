@@ -128,8 +128,9 @@ else
 fi
 
 # --- 6. start ----------------------------------------------------------------
-log "Starting the stack (docker compose up -d --no-build)"
-compose up -d --no-build
+log "Starting the stack (docker compose up -d --no-build db api)"
+compose_up_core
+compose_up_frontends
 
 log "Waiting up to ${WAIT_SECONDS}s for the health gate (/health + /ops/status)"
 HEALTH_SECONDS="$(wait_for_health "${WAIT_SECONDS}")" || {

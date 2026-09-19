@@ -41,6 +41,12 @@
   - [Port Mappings](#port-mappings)
   - [Environment Variables](#environment-variables)
   - [Production VPS Runbook](#production-vps-runbook)
+- [Field Operations](#field-operations)
+  - [Preflight a host](#preflight-a-host)
+  - [Build an air-gap bundle](#build-an-air-gap-bundle)
+  - [Install, upgrade, roll back](#install-upgrade-roll-back)
+  - [Operate a running deployment](#operate-a-running-deployment)
+  - [Rehearse the failure modes](#rehearse-the-failure-modes)
 - [Local Development](#local-development)
 - [Groq API Key & Demo Fallback](#groq-api-key--demo-fallback)
 - [Evaluation Suite (RAGAS)](#evaluation-suite-ragas)
@@ -65,6 +71,8 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 - **FastAPI + Next.js 15**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 15 frontend and Streamlit demo.
 - **Bilingual EN/HI**: Native multi-lingual query understanding, cross-language vector retrieval, and localized UI controls.
 - **Quote-verified answers**: Deterministic exact substring validation preventing fabricated clauses, amounts, or guidelines.
+- **Operator control plane**: AI kill switch, provider circuit breaker, and runtime provider-endpoint override, so generation can be stopped, rerouted, or degraded to retrieval-only answers without taking the service down (`GET /ops/status`).
+- **Field deployment kit**: air-gap install bundle with checksums and signatures, host preflight doctor (TLS interception, clock skew, egress policy), upgrade with database+config snapshot, and a rehearsed automatic rollback (`deploy/field/`).
 
 ---
 
@@ -297,6 +305,10 @@ SchemeGPT/
 | `PUT /profiles/{id}` | `PUT` | Update saved citizen profile. | Header: `X-Profile-Token` |
 | `DELETE /profiles/{id}`| `DELETE` | Delete saved citizen profile. | Header: `X-Profile-Token` |
 | `POST /ingest` | `POST` | Trigger re-ingestion of `data/schemes` & `data/states` vectors. | Header: `X-Admin-Token` |
+| `GET /ops/status` | `GET` | Operator snapshot: AI switch state, provider circuit breaker, degraded-answer counters, masked provider endpoint. | None |
+| `POST /ops/ai` | `POST` | Operator kill switch: stop LLM generation for this instance and serve retrieval-only answers; the decision persists across restarts. | Header: `X-Admin-Token` |
+| `POST /ops/provider` | `POST` | Repoint generation at another endpoint (customer API gateway, egress proxy, secondary provider) at runtime. | Header: `X-Admin-Token` |
+| `GET /ops/audit` | `GET` | Bounded, sanitized operator audit trail (who disabled generation, when, why). | Header: `X-Admin-Token` |
 | `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage. | None |
 | `POST /feedback` | `POST` | Thumbs-up/down rating on one answer; curated ratings grow the eval set (`scripts/feedback_to_eval.py`). | None |
 
@@ -351,6 +363,64 @@ cp .env.example .env && docker compose up -d --build
    # Restore snapshot
    docker compose exec -T db psql -U scheme -d schemegpt < backup_schemegpt.sql
    ```
+
+---
+
+## Field Operations
+
+Everything above gets the stack running on a machine you control. This section is for the other case: a machine you *don't* control, a network that blocks egress, and a change that has to be reversible. The tooling lives in [`deploy/field/`](deploy/field/) and the runbook is [`docs/FIELD-DEPLOY.md`](docs/FIELD-DEPLOY.md); measured results from a full rehearsal are in [`docs/evidence/FIELD-DRILL.md`](docs/evidence/FIELD-DRILL.md).
+
+### Preflight a host
+
+```bash
+python3 deploy/field/preflight.py --label "customer-prod-01" \
+    --json deploy/field/reports/preflight-customer-prod-01.json
+```
+
+A stdlib-only doctor (no venv, no pip, no internet) with stable finding codes: Docker and Compose availability, disk/memory/CPU, port collisions, DNS and TCP egress to the registry and the model provider, **corporate TLS interception**, **clock skew measured against the provider's `Date` header**, `.env` key presence (values are never printed), images and corpus. `--airgap` mode reclassifies the expected offline findings as informational. Exit codes: `0` go, `1` blockers, `2` go with warnings.
+
+### Build an air-gap bundle
+
+```bash
+bash deploy/field/bundle.sh --version v2.0.0 --sign
+```
+
+Images as tarballs plus `MANIFEST.json` (immutable image IDs and digests), `SHA256SUMS`, an optional detached RSA-3072 signature, and the install scripts. On the far side:
+
+```bash
+./verify.sh --signature   # checksums + signature, before anything is loaded
+./install.sh --airgap     # verify, load, preflight, start, health-gate, smoke
+```
+
+`install.sh` refuses to start without a `.env` — secrets are never generated silently — and gates on `/health` **and** `/ops/status`, accepting a 404 there so this kit can upgrade *from* a build that predates the operator control plane.
+
+### Install, upgrade, roll back
+
+```bash
+bash deploy/field/upgrade.sh --to-version v2.0.1     # snapshot, gate, smoke, auto-rollback
+bash deploy/field/rollback.sh                         # back to the recorded previous version
+```
+
+An upgrade snapshots the database **and the environment file** (a release is code *and* configuration), pins the new image, gates on health *and* on a real `POST /query`, and compares the vector-store row count before and after — a migration that drops rows is a data incident no health check can see. Any failure triggers an automatic rollback of image and config, with both attempts recorded as JSON under `deploy/field/logs/`.
+
+### Operate a running deployment
+
+```bash
+curl -s http://127.0.0.1:8000/ops/status     # AI state, circuit breaker, degraded counters
+curl -s -X POST http://127.0.0.1:8000/ops/ai \
+  -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": false, "reason": "pilot review", "actor": "oncall"}'
+```
+
+The kill switch stops generation and serves **retrieval-only answers**: the same endpoint, HTTP 200, `mode: "degraded"`, and an answer assembled from verbatim source excerpts whose citation lines are verified mechanically. No generated prose, no pretending, and the decision survives a restart. `/health` deliberately stays `ok` while generation is off — a human pressed a switch, so the container must not be restarted for it. The provider circuit breaker opens after repeated failures and stops calling a provider that is already failing, then recovers with a single probe.
+
+### Rehearse the failure modes
+
+```bash
+python3 deploy/field/drill.py --phases A,B,C,D,E,F,G
+```
+
+Drives a real deployment through install, upgrade, a deliberately broken release (which must fail its gate and roll back by itself), the kill switch (including a container restart to prove persistence), a sustained provider outage against a local stub, and a no-egress window — writing measured results to `docs/evidence/FIELD-DRILL.md`. Nothing in the drill reaches a real provider: the stub is attached through `POST /ops/provider`, so it is deterministic and free.
 
 ---
 

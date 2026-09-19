@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",
+        # A deployment's .env is not ours alone: customers and the field kit add
+        # their own keys (proxies, deployment pins, site labels). pydantic-settings
+        # defaults to rejecting unknown keys, which turns an unrelated variable
+        # into a startup crash — that is a data-plane outage caused by config
+        # hygiene. Unknown keys are ignored here on purpose.
+        extra="ignore",
     )
 
 
