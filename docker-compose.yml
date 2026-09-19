@@ -20,9 +20,23 @@ services:
       start_period: 10s
 
   api:
+    # Pinned by the field kit (deploy/field/upgrade.sh, rollback.sh); falls back
+    # to the local build. Keeping both means `docker compose build` still works
+    # for development while a deployment moves between prebuilt, versioned
+    # images that were verified before loading.
+    image: ${SCHEMEGPT_API_IMAGE:-schemegpt-api:latest}
     build: .
     restart: unless-stopped
     env_file: .env
+    # Field deployments often reach the customer's API gateway / egress proxy on
+    # the host (or the host's own stub in an incident drill). host-gateway keeps
+    # that reachable on Linux as well as Docker Desktop.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Operator state (AI kill switch) lives here so it survives container
+      # replacement. Without this mount the switch is lost on recreate.
+      - ./var:/app/var
     depends_on:
       db:
         condition: service_healthy

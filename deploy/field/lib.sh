@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# Shared helpers for the SchemeGPT field kit (preflight / bundle / install /
+# upgrade / rollback). Sourced, never executed directly.
+#
+# Conventions this kit holds to, because field work is where conventions die:
+#   * Every action writes a JSON record under deploy/field/logs/ with the
+#     version it started from, the version it ended at, timings, and the health
+#     gate result. If an engagement is ever questioned, that file is the answer.
+#   * A readiness gate that cannot prove the service is healthy fails the
+#     deploy. "It started" is not "it works".
+#   * Nothing here deletes data. Destructive options exist only behind explicit
+#     flags and are named as such.
+
+set -euo pipefail
+
+FIELD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The kit runs in two layouts: inside the repository (deploy/field/, compose
+# two levels up) and unpacked from a delivery bundle (compose beside it).
+if [ -n "${SCHEMEGPT_ROOT:-}" ]; then
+  REPO_ROOT="$(cd "${SCHEMEGPT_ROOT}" && pwd)"
+elif [ -f "${FIELD_DIR}/../docker-compose.yml" ]; then
+  REPO_ROOT="$(cd "${FIELD_DIR}/.." && pwd)"
+elif [ -f "${FIELD_DIR}/docker-compose.yml" ]; then
+  REPO_ROOT="${FIELD_DIR}"
+else
+  REPO_ROOT="$(cd "${FIELD_DIR}/../.." && pwd)"
+fi
+
+LOG_DIR="${SCHEMEGPT_LOG_DIR:-${FIELD_DIR}/logs}"
+STATE_DIR="${SCHEMEGPT_STATE_DIR:-${FIELD_DIR}/state}"
+BACKUP_DIR="${SCHEMEGPT_BACKUP_DIR:-${FIELD_DIR}/backups}"
+REPORTS_DIR="${SCHEMEGPT_REPORTS_DIR:-${FIELD_DIR}/reports}"
+
+PROJECT_NAME="${SCHEMEGPT_PROJECT:-schemegpt}"
+COMPOSE_FILE="${SCHEMEGPT_COMPOSE:-${REPO_ROOT}/docker-compose.yml}"
+API_URL="${SCHEMEGPT_API_URL:-http://127.0.0.1:8000}"
+DB_SERVICE="db"
+API_SERVICE="api"
+
+mkdir -p "${LOG_DIR}" "${STATE_DIR}" "${BACKUP_DIR}" "${REPORTS_DIR}"
+
+log()  { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+warn() { printf '[%s] WARN: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+die()  { printf '[%s] FATAL: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; exit 1; }
+
+# The kit is Python-assisted (preflight, JSON records); require it once.
+detect_python() {
+  if command -v python3 >/dev/null 2>&1; then PYTHON=python3
+  elif command -v python >/dev/null 2>&1; then PYTHON=python
+  else die "python3 is required by the field kit (preflight, deploy records)."; fi
+}
+
+compose() {
+  docker compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" "$@"
+}
+
+now_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+json_write() {
+  # json_write <path> <python-expression producing a dict>
+  # The expression receives `data` (a dict built by the caller through env vars
+  # is awkward in bash), so callers pass a JSON string instead.
+  local path="$1" payload="$2"
+  detect_python
+  "${PYTHON}" - "$path" "$payload" <<'PY'
+import json, sys, pathlib
+path, payload = sys.argv[1], sys.argv[2]
+try:
+    data = json.loads(payload)
+except Exception as exc:
+    raise SystemExit(f"invalid JSON payload for {path}: {exc}")
+pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+pathlib.Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+PY
+}
+
+# --- service health ----------------------------------------------------------
+
+http_code() {
+  # http_code <url> [timeout] -> prints the status code, or 000 on failure
+  local url="$1" timeout="${2:-5}"
+  detect_python
+  "${PYTHON}" - "$url" "$timeout" <<'PY'
+import sys, urllib.request, urllib.error
+url, timeout = sys.argv[1], float(sys.argv[2])
+try:
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        print(response.status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+except Exception:
+    print("000")
+PY
+}
+
+http_json() {
+  # http_json <url> [timeout] -> prints the body, or empty on failure
+  local url="$1" timeout="${2:-5}"
+  detect_python
+  "${PYTHON}" - "$url" "$timeout" <<'PY'
+import sys, urllib.request
+url, timeout = sys.argv[1], float(sys.argv[2])
+try:
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        print(response.read().decode("utf-8", "replace"))
+except Exception:
+    print("")
+PY
+}
+
+wait_for_health() {
+  # wait_for_health <timeout_seconds> -> 0 when the service is actually up.
+  #
+  # The gate is /health (which proves the API answered *and* its database probe
+  # succeeded). /ops/status is checked too, but a 404 is accepted: that is what
+  # an older build without the operator control plane returns, and this kit must
+  # be able to upgrade *from* one of those. Prints elapsed seconds on success.
+  local timeout="${1:-420}" started elapsed body ops_code
+  started="$(date +%s)"
+  while :; do
+    elapsed=$(( $(date +%s) - started ))
+    if [ "${elapsed}" -ge "${timeout}" ]; then
+      warn "health gate timed out after ${timeout}s"
+      return 1
+    fi
+    body="$(http_json "${API_URL}/health" 5)"
+    if printf '%s' "${body}" | grep -q '"status": *"ok"\|"status":"ok"'; then
+      ops_code="$(http_code "${API_URL}/ops/status" 5)"
+      case "${ops_code}" in
+        200) echo "${elapsed}"; return 0 ;;
+        404) warn "/ops/status absent (pre-field-layer build); accepting /health only."
+             echo "${elapsed}"; return 0 ;;
+      esac
+    fi
+    sleep 5
+  done
+}
+
+api_smoke() {
+  # api_smoke <question> -> prints the mode reported by POST /query, or 000
+  detect_python
+  "${PYTHON}" - "$API_URL" "${1:-How much income support does PM-KISAN provide?}" <<'PY'
+import json, sys, urllib.request
+api, question = sys.argv[1], sys.argv[2]
+payload = json.dumps({"question": question}).encode()
+request = urllib.request.Request(
+    f"{api}/query", data=payload, headers={"Content-Type": "application/json"}
+)
+try:
+    with urllib.request.urlopen(request, timeout=120) as response:
+        body = json.loads(response.read().decode())
+        print(f"{response.status}:{body.get('mode')}:{len(body.get('sources') or [])}")
+except Exception as exc:
+    print(f"000:{type(exc).__name__}:0")
+PY
+}
+
+vector_count() {
+  # vector_count -> row count in the vector store, or -1 when it cannot be read
+  local out
+  out="$(compose exec -T "${DB_SERVICE}" psql -U scheme -d schemegpt -tAc \
+        "select count(*) from langchain_pg_embedding" 2>/dev/null | tr -d '[:space:]')" || out=""
+  case "${out}" in
+    ''|*[!0-9]*) echo "-1" ;;
+    *) echo "${out}" ;;
+  esac
+}
+
+# --- deployment state --------------------------------------------------------
+
+write_deployed_state() {
+  # write_deployed_state <version> <image_ref> <previous_version> <previous_image>
+  local version="$1" image="$2" prev_version="${3:-}" prev_image="${4:-}"
+  json_write "${STATE_DIR}/deployed.json" "$(cat <<JSON
+{
+  "version": "${version}",
+  "image": "${image}",
+  "previous_version": "${prev_version}",
+  "previous_image": "${prev_image}",
+  "updated_at": "$(now_utc)"
+}
+JSON
+)"
+}
+
+read_state_field() {
+  # read_state_field <field> -> value or empty
+  local field="$1" file="${STATE_DIR}/deployed.json"
+  [ -f "${file}" ] || { echo ""; return 0; }
+  detect_python
+  "${PYTHON}" - "$file" "$field" <<'PY'
+import json, sys, pathlib
+data = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+value = data.get(sys.argv[2], "")
+print("" if value is None else value)
+PY
+}
+
+set_api_image() {
+  # set_api_image <image_ref> — pin the API image for compose substitution.
+  # Kept in .env because that is where compose looks; one managed line, marked
+  # so a human can see who wrote it and why.
+  local image="$1" env_file="${REPO_ROOT}/.env" tmp
+  [ -f "${env_file}" ] || die "no .env at ${env_file}; run install.sh first."
+  tmp="$(mktemp)"
+  grep -v '^SCHEMEGPT_API_IMAGE=' "${env_file}" > "${tmp}" || true
+  printf '# field kit: pinned by deploy/field/upgrade.sh or rollback.sh\nSCHEMEGPT_API_IMAGE=%s\n' \
+    "${image}" >> "${tmp}"
+  cat "${tmp}" > "${env_file}"
+  rm -f "${tmp}"
+  log "Pinned SCHEMEGPT_API_IMAGE=${image} in $(basename "${env_file}")"
+}
+
+snapshot_db() {
+  # snapshot_db <label> -> prints the backup path
+  local label="$1" path
+  path="${BACKUP_DIR}/$(date -u +%Y%m%dT%H%M%SZ)-${label}.sql"
+  log "Snapshotting the database to ${path}"
+  if ! compose exec -T "${DB_SERVICE}" pg_dump -U scheme -d schemegpt > "${path}"; then
+    rm -f "${path}"
+    die "database snapshot failed; refusing to upgrade without a rollback point."
+  fi
+  local size
+  size="$(wc -c < "${path}" | tr -d ' ')"
+  [ "${size}" -gt 1000 ] || die "database snapshot looks empty (${size} bytes); aborting."
+  echo "${path}"
+}
+
+deploy_record() {
+  # deploy_record <action> <json_extra_object>
+  local action="$1" extra="${2:-\{\}}" path
+  path="${LOG_DIR}/$(date -u +%Y%m%dT%H%M%SZ)-${action}.json"
+  json_write "${path}" "$(cat <<JSON
+{
+  "schema": 1,
+  "action": "${action}",
+  "at": "$(now_utc)",
+  "host": "$(hostname)",
+  "project": "${PROJECT_NAME}",
+  "compose_file": "${COMPOSE_FILE}",
+  "extra": ${extra}
+}
+JSON
+)"
+  echo "${path}"
+}

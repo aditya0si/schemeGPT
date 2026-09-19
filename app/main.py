@@ -11,13 +11,17 @@ from app import catalog, ingest, profiles, recommend
 from app import feedback as feedback_store
 from app.config import settings
 from app.db import COLLECTION_NAME, get_engine
+from app.ops import ops as operator
 from app.rag import answer
+from app.rag import reset_chains as reset_rag_chains
 from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
 from app.tracing import setup_tracing
 from app.schemas import (
     FeedbackRequest,
     FeedbackResponse,
+    OpsAIRequest,
+    OpsProviderRequest,
     ProfileCreateResponse,
     ProfileData,
     ProfileResponse,
@@ -26,6 +30,26 @@ from app.schemas import (
     RecommendationRequest,
     RecommendationResponse,
 )
+
+
+def _require_admin(x_admin_token: str) -> None:
+    """Shared admin guard for the ingestion and operator endpoints.
+
+    Constant-time comparison against ``ADMIN_TOKEN``. When no token is
+    configured these endpoints are *disabled* (503) rather than left open: an
+    unauthenticated operator endpoint on a public deployment is how a demo
+    becomes an incident. Tokens are never logged.
+    """
+    if not settings.admin_token.strip():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "This endpoint is disabled: no ADMIN_TOKEN is configured. "
+                "Set ADMIN_TOKEN to enable operator controls."
+            ),
+        )
+    if not secrets.compare_digest(x_admin_token, settings.admin_token):
+        raise HTTPException(status_code=401, detail="Invalid admin token.")
 
 
 def count_vectors() -> int:
@@ -95,30 +119,28 @@ app.add_middleware(RateLimitMiddleware)
 
 @app.get("/health")
 def health():
+    """Liveness, plus a safe summary of operator state.
+
+    Deliberately still ``ok`` while AI generation is switched off or the
+    provider circuit is open: the service is up and serving retrieval-only
+    answers. That is an operator decision, not an outage — and the container
+    healthcheck must not restart the API because a human pressed the kill
+    switch. Pod/platform alerting should watch the ``ai`` and
+    ``provider_circuit`` fields instead.
+    """
     with get_engine().connect() as conn:
         conn.execute(text("SELECT 1"))
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "ai": "enabled" if operator.ai_enabled else "disabled",
+        "provider_circuit": operator.breaker.state,
+    }
 
 
 @app.post("/ingest")
 def ingest_docs(x_admin_token: str = Header(default="")):
-    """Re-ingest Markdown sources into the vector store (admin only).
-
-    Protected by the ``X-Admin-Token`` header, compared in constant time with
-    the configured ``ADMIN_TOKEN``. When no ``ADMIN_TOKEN`` is configured the
-    endpoint is disabled with a clear 503 response: manual re-ingestion must
-    not be exposed publicly. Startup auto-ingestion is unchanged and still runs
-    (idempotently) when the vector store is empty. Tokens are never logged.
-    """
-    if not settings.admin_token.strip():
-        raise HTTPException(
-            status_code=503,
-            detail="Ingestion is disabled: no ADMIN_TOKEN is configured.",
-        )
-    if not secrets.compare_digest(x_admin_token, settings.admin_token):
-        raise HTTPException(
-            status_code=401, detail="Invalid admin token."
-        )
+    """Re-ingest Markdown sources into the vector store (admin only)."""
+    _require_admin(x_admin_token)
     return {"chunks": ingest.ingest()}
 
 
@@ -272,6 +294,77 @@ async def query_stream(req: QueryRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- Operator control plane (field) ------------------------------------------
+# See app/ops.py. These are the controls an engineer uses *after* go-live:
+# stop generation, route to another provider endpoint, see why answers are
+# degraded. Control endpoints require ADMIN_TOKEN; the read-only status
+# endpoint is public and safe (no secrets, no audit reasons, masked URLs).
+
+
+@app.get("/ops/status")
+def ops_status():
+    """Operator snapshot: AI switch, provider circuit breaker, degraded counts.
+
+    Safe to expose publicly: it carries states and counters only. Provider
+    error *types* are included (``RateLimitError``), provider error text is
+    not, and the endpoint URL is masked to scheme://host/path with any userinfo
+    or query string removed.
+    """
+    return operator.status()
+
+
+@app.get("/ops/audit")
+def ops_audit(x_admin_token: str = Header(default="")):
+    """Operator action trail, newest last (admin only).
+
+    Admin-only because a disable reason is written during an incident and can
+    name a customer, a person, or a ticket — useful to an operator, not
+    something to publish on a status endpoint.
+    """
+    _require_admin(x_admin_token)
+    return {"audit": operator.audit()}
+
+
+@app.post("/ops/ai")
+def ops_set_ai(payload: OpsAIRequest, x_admin_token: str = Header(default="")):
+    """Turn AI generation on or off for this instance (admin only).
+
+    Off means retrieval-only answers: the service stays up, keeps citing real
+    source documents, and stops calling the model. The decision is persisted to
+    ``OPS_STATE_FILE``, so it survives a restart or a redeploy — and it is
+    recorded in the audit trail with the actor and reason.
+    """
+    _require_admin(x_admin_token)
+    if payload.enabled:
+        return operator.enable_ai(actor=payload.actor, reason=payload.reason)
+    return operator.disable_ai(reason=payload.reason, actor=payload.actor)
+
+
+@app.post("/ops/provider")
+def ops_set_provider(
+    payload: OpsProviderRequest, x_admin_token: str = Header(default="")
+):
+    """Repoint the LLM client at another endpoint, or clear the override.
+
+    This is the "route our traffic through your gateway" control: an operator
+    can send generation through the customer's egress proxy or a secondary
+    provider without a rebuild or redeploy. Applied in memory and not written to
+    disk — the durable form is ``GROQ_API_BASE`` in the environment, so an
+    endpoint can never be changed permanently by someone with API access alone.
+    """
+    _require_admin(x_admin_token)
+    try:
+        state = operator.set_provider_base_url(
+            payload.base_url, actor=payload.actor, reason=payload.reason
+        )
+    except ValueError as exc:
+        # Safe by construction: the validator never echoes the URL back.
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    # The cached retrieval chain holds an LLM client bound to the old endpoint.
+    reset_rag_chains()
+    return state
 
 
 @app.get("/metrics")

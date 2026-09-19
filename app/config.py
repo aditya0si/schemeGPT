@@ -41,6 +41,28 @@ class Settings(BaseSettings):
     # the local Streamlit dev origins.
     cors_origins: str = "http://localhost:8501,http://127.0.0.1:8501"
 
+    # --- Field / operator controls (see app/ops.py) ----------------------
+    # Initial AI generation state. The runtime kill switch (POST /ops/ai)
+    # persists to OPS_STATE_FILE and overrides this value on restart, so an
+    # operator decision survives a redeploy.
+    ops_ai_enabled: bool = True
+    # Durable operator state (kill switch). Relative paths resolve against the
+    # repository root; point this at a mounted volume to survive container
+    # replacement (see docs/FIELD-DEPLOY.md).
+    ops_state_file: str = "var/ops_state.json"
+    # Optional provider endpoint override: route LLM traffic through the
+    # customer's API gateway / egress proxy, or a secondary provider.
+    # Example: GROQ_API_BASE=https://llm-gw.customer.internal/groq/v1
+    groq_api_base: str = ""
+    # Circuit breaker: open after this many consecutive provider failures and
+    # stop calling a provider that is already failing; one probe after the
+    # cooldown decides whether to close.
+    breaker_failure_threshold: int = 3
+    breaker_reset_timeout_s: float = 30.0
+    # Build identity reported by GET /ops/status (set at image build time from
+    # the deployed commit; see deploy/field/).
+    git_sha: str = ""
+
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",

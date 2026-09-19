@@ -21,11 +21,12 @@ import anyio
 
 from app import metrics, semantic_cache
 from app.agent import needs_multi_step, run_agent_gather
+from app.ops import ops as operator
 from app.rag import (
     _build_profile_context,
     _normalize_language,
     build_answer_chain,
-    demo_answer,
+    fallback_answer,
     get_llm,
     get_retriever,
     normalize_question,
@@ -64,6 +65,34 @@ def _source_dict(doc) -> dict:
     }
 
 
+async def _stream_fallback(payload: dict, lang: str) -> AsyncIterator[str]:
+    """Stream a non-live payload (degraded or demo) in the standard event shape.
+
+    ``sources`` -> ``token``* -> ``quotes`` -> ``done``. The ``done`` event
+    carries the payload's own ``mode`` (``degraded`` or ``demo``) and notice,
+    so a client can distinguish "AI is switched off, here are source excerpts"
+    from "no live service configured, here is a demo answer".
+    """
+    sources = payload.get("sources", [])
+    answer_text = payload.get("answer", "")
+    yield _sse("sources", sources)
+    for word in answer_text.split(" "):
+        yield _sse("token", {"text": word + " "})
+    quoted = verify_quotes(parse_quotes(answer_text), sources)
+    if quoted:
+        yield _sse("quotes", [q.__dict__ for q in quoted])
+    mode = payload.get("mode", "demo")
+    metrics.inc("queries_degraded" if mode == "degraded" else "queries_demo")
+    yield _sse(
+        "done",
+        {
+            "mode": mode,
+            "notice": payload.get("notice"),
+            "language": payload.get("language", lang),
+        },
+    )
+
+
 async def stream_answer(
     question: str,
     language: str = "en",
@@ -94,6 +123,17 @@ async def stream_answer(
                 "done",
                 {"mode": "live", "notice": None, "language": lang, "cached": True},
             )
+            return
+        # Operator controls: the kill switch and the provider circuit breaker
+        # both short-circuit to the retrieval-only answer, streamed with the
+        # same event shape so the client needs no special case.
+        gate = operator.gate()
+        if gate != "ok":
+            payload = await anyio.to_thread.run_sync(
+                lambda: fallback_answer(question, lang, profile, reason=gate)
+            )
+            async for event in _stream_fallback(payload, lang):
+                yield event
             return
         if needs_multi_step(question, profile):
             metrics.inc("agent_routes_total")
@@ -153,6 +193,7 @@ async def stream_answer(
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
         usage.record(settings.groq_model)
+        operator.record_provider_success()
         metrics.inc("queries_live")
         await anyio.to_thread.run_sync(
             semantic_cache.store,
@@ -171,6 +212,7 @@ async def stream_answer(
     except Exception as exc:
         if tokens_sent:
             metrics.inc("stream_midstream_failures")
+            operator.record_provider_failure(type(exc).__name__)
             logger.error(
                 "Live stream failed mid-answer (%s).", type(exc).__name__
             )
@@ -185,19 +227,17 @@ async def stream_answer(
                 },
             )
             return
+        opened = operator.record_provider_failure(type(exc).__name__)
         logger.error(
-            "Live stream failed before answer (%s); streaming demo answer.",
+            "Live stream failed before answer (%s); streaming retrieval-only "
+            "answer%s.",
             type(exc).__name__,
+            " and opening the provider circuit" if opened else "",
         )
-        demo = demo_answer(question, lang)
-        yield _sse("sources", demo["sources"])
-        for word in demo["answer"].split(" "):
-            yield _sse("token", {"text": word + " "})
-        demo_verified = verify_quotes(parse_quotes(demo["answer"]), demo["sources"])
-        if demo_verified:
-            yield _sse("quotes", [q.__dict__ for q in demo_verified])
-        metrics.inc("queries_demo")
-        yield _sse(
-            "done",
-            {"mode": "demo", "notice": demo["notice"], "language": lang},
+        payload = await anyio.to_thread.run_sync(
+            lambda: fallback_answer(
+                question, lang, profile, reason="provider_failure"
+            )
         )
+        async for event in _stream_fallback(payload, lang):
+            yield event

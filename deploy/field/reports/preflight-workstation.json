@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "tool": "schemegpt-preflight",
+  "label": "aditya-workstation-win11",
+  "host": "Aditya",
+  "platform": "Windows 11",
+  "python": "3.12.6",
+  "repo_root": "C:\\Users\\oliad\\Desktop\\SchemeGPT",
+  "airgap": false,
+  "started_at": "2026-09-20T02:27:25+05:30",
+  "thresholds": {
+    "disk_min_gb": 12.0,
+    "disk_warn_gb": 25.0,
+    "mem_min_gb": 3.5,
+    "mem_warn_gb": 7.0,
+    "clock_skew_warn_s": 120,
+    "clock_skew_blocker_s": 900
+  },
+  "counts": {
+    "OK": 21,
+    "INFO": 3,
+    "WARN": 1,
+    "BLOCKER": 0
+  },
+  "verdict": "GO (with warnings)",
+  "exit_code": 2,
+  "findings": [
+    {
+      "code": "PF-001",
+      "title": "Python runtime",
+      "severity": "OK",
+      "detail": "3.12.6 on Windows 11",
+      "remediation": ""
+    },
+    {
+      "code": "PF-002",
+      "title": "Host identity",
+      "severity": "INFO",
+      "detail": "hostname=Aditya arch=AMD64",
+      "remediation": ""
+    },
+    {
+      "code": "PF-003",
+      "title": "Working directory writable",
+      "severity": "OK",
+      "detail": "C:\\Users\\oliad\\Desktop\\SchemeGPT",
+      "remediation": ""
+    },
+    {
+      "code": "PF-010",
+      "title": "Docker CLI",
+      "severity": "OK",
+      "detail": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.EXE",
+      "remediation": ""
+    },
+    {
+      "code": "PF-011",
+      "title": "Docker daemon",
+      "severity": "OK",
+      "detail": "29.6.2",
+      "remediation": ""
+    },
+    {
+      "code": "PF-012",
+      "title": "Docker Compose",
+      "severity": "OK",
+      "detail": "Docker Compose version v5.3.1",
+      "remediation": ""
+    },
+    {
+      "code": "PF-020",
+      "title": "Free disk space",
+      "severity": "OK",
+      "detail": "127.7 GB free (min 12.0 GB, warn under 25.0 GB)",
+      "remediation": ""
+    },
+    {
+      "code": "PF-021",
+      "title": "Memory",
+      "severity": "OK",
+      "detail": "23.6 GB total (min 3.5 GB, warn under 7.0 GB)",
+      "remediation": ""
+    },
+    {
+      "code": "PF-022",
+      "title": "CPU count",
+      "severity": "OK",
+      "detail": "16 logical cores",
+      "remediation": ""
+    },
+    {
+      "code": "PF-030",
+      "title": "Port 8000",
+      "severity": "OK",
+      "detail": "free",
+      "remediation": ""
+    },
+    {
+      "code": "PF-031",
+      "title": "Port 8501",
+      "severity": "OK",
+      "detail": "free",
+      "remediation": ""
+    },
+    {
+      "code": "PF-032",
+      "title": "Port 3000",
+      "severity": "OK",
+      "detail": "free",
+      "remediation": ""
+    },
+    {
+      "code": "PF-043",
+      "title": "Proxy environment",
+      "severity": "INFO",
+      "detail": "no proxy variables set",
+      "remediation": ""
+    },
+    {
+      "code": "PF-040",
+      "title": "DNS: registry-1.docker.io",
+      "severity": "OK",
+      "detail": "container image pulls; resolves to 107.20.19.148, 23.21.48.166, 3.220.72.168",
+      "remediation": ""
+    },
+    {
+      "code": "PF-042",
+      "title": "TCP 443: registry-1.docker.io",
+      "severity": "OK",
+      "detail": "container image pulls; connected",
+      "remediation": ""
+    },
+    {
+      "code": "PF-041",
+      "title": "DNS: api.groq.com",
+      "severity": "OK",
+      "detail": "LLM provider API; resolves to 104.18.38.236, 172.64.149.20",
+      "remediation": ""
+    },
+    {
+      "code": "PF-044",
+      "title": "TCP 443: api.groq.com",
+      "severity": "OK",
+      "detail": "LLM provider API; connected",
+      "remediation": ""
+    },
+    {
+      "code": "PF-045",
+      "title": "TLS trust chain (provider)",
+      "severity": "OK",
+      "detail": "HTTPS 404, leaf issuer=WE1",
+      "remediation": ""
+    },
+    {
+      "code": "PF-046",
+      "title": "Clock skew",
+      "severity": "OK",
+      "detail": "local clock is +0.4s from the provider's Date header (warn >= 120s, blocker >= 900s)",
+      "remediation": ""
+    },
+    {
+      "code": "PF-050",
+      "title": "Environment file",
+      "severity": "OK",
+      "detail": "C:\\Users\\oliad\\Desktop\\SchemeGPT\\.env present with 5 keys (values never printed)",
+      "remediation": ""
+    },
+    {
+      "code": "PF-051",
+      "title": "Required settings",
+      "severity": "OK",
+      "detail": "DATABASE_URL present",
+      "remediation": ""
+    },
+    {
+      "code": "PF-052",
+      "title": "Optional settings",
+      "severity": "WARN",
+      "detail": "ADMIN_TOKEN (absent: operator endpoints return 503)",
+      "remediation": ""
+    },
+    {
+      "code": "PF-053",
+      "title": "Operator state path",
+      "severity": "INFO",
+      "detail": "C:\\Users\\oliad\\Desktop\\SchemeGPT\\var\\ops_state.json (parent exists: False)",
+      "remediation": "Created on first start. On a container install, mount this path on a volume so the kill switch survives container replacement."
+    },
+    {
+      "code": "PF-060",
+      "title": "Stack images present",
+      "severity": "OK",
+      "detail": "schemegpt:baseline, schemegpt:v1.0.0, schemegpt-api:latest, schemegpt-web:latest",
+      "remediation": ""
+    },
+    {
+      "code": "PF-061",
+      "title": "Corpus present",
+      "severity": "OK",
+      "detail": "6 markdown scheme records in C:\\Users\\oliad\\Desktop\\SchemeGPT\\data\\schemes",
+      "remediation": ""
+    }
+  ]
+}

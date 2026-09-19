@@ -158,3 +158,32 @@ class FeedbackRequest(BaseModel):
 
 class FeedbackResponse(BaseModel):
     stored: bool
+
+
+# --- Operator (field) control plane: see app/ops.py --------------------------
+
+
+class OpsAIRequest(BaseModel):
+    """Turn AI generation on or off for this instance.
+
+    ``reason`` is stored in the operator audit trail (bounded, sanitized) and
+    is never exposed on the public ``GET /ops/status``. ``actor`` is a free
+    label for who did it (e.g. an on-call handle), not an identity system.
+    """
+
+    enabled: bool
+    reason: str = Field(default="", max_length=200)
+    actor: str = Field(default="", max_length=64)
+
+
+class OpsProviderRequest(BaseModel):
+    """Point the LLM client at another endpoint, or clear the override.
+
+    An empty ``base_url`` clears the runtime override and returns to the
+    configured ``GROQ_API_BASE``. Applied in memory; the durable form is the
+    environment variable.
+    """
+
+    base_url: str = Field(default="", max_length=500)
+    reason: str = Field(default="", max_length=200)
+    actor: str = Field(default="", max_length=64)
