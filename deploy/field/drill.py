@@ -550,19 +550,18 @@ def phase_broken_release(report: dict) -> None:
     log(f"PHASE C: ship a broken release ({BROKEN_VERSION}) and require a rollback")
     healthy_before = {"mode": ask()["mode"], "status": ops_status()}
 
-    # Build the bad release: same image, one broken setting — a database
-    # connection string that points nowhere, which is both realistic (config
-    # travels with the release) and decisive (the API cannot pass its own
-    # /health probe, so the gate must catch it).
-    #
-    # Deliberately NOT a bad EMBEDDING_MODEL: embeddings load lazily, so the API
-    # would report healthy and keep answering in degraded mode. The drill would
-    # then be testing nothing while claiming to test the gate.
-    set_env(
-        "DATABASE_URL",
-        "postgresql+psycopg2://scheme:scheme@db-does-not-exist:5432/schemegpt",
+    # The bad release is a *release*: a config patch that travels with it. The
+    # kit applies it after snapshotting the current environment, so the
+    # automatic rollback has something good to restore. Writing the bad value
+    # into .env before upgrading — as an earlier version of this drill did —
+    # makes the kit snapshot the breakage and then faithfully reinstate it,
+    # which tests the wrong thing and quietly leaves the deployment broken.
+    patch_file = FIELD_DIR / "state" / "broken-release.env"
+    patch_file.write_text(
+        "DATABASE_URL=postgresql+psycopg2://scheme:scheme@db-does-not-exist:5432/schemegpt\n",
+        encoding="utf-8",
     )
-    log("Injected a broken DATABASE_URL (host db-does-not-exist)")
+    log("Release config patch prepared: unreachable DATABASE_URL (host db-does-not-exist)")
 
     started = time.time()
     result = run(
@@ -573,13 +572,22 @@ def phase_broken_release(report: dict) -> None:
             BROKEN_VERSION,
             "--to-image",
             f"schemegpt-api:{RELEASE_VERSION}",
+            "--config-patch",
+            sh_script(patch_file),
             "--wait",
             "120",
         ],
         check=False,
     )
+    # Let the rollback's own gate settle before probing the deployment again.
+    try:
+        wait_healthy(timeout=180)
+    except Exception:
+        pass
     after = ops_status()
     healthy_after = ask()
+    restored_url = read_env().get("DATABASE_URL", "")
+    env_restored = "db-does-not-exist" not in restored_url
     report["C_broken_release"] = {
         "exit_code": result.returncode,
         "seconds": round(time.time() - started, 2),
@@ -587,8 +595,8 @@ def phase_broken_release(report: dict) -> None:
         "rolled_back_to_version": after.get("version"),
         "healthy_after_rollback": healthy_after["mode"],
         "mode_before": healthy_before["mode"],
+        "config_restored": env_restored,
         "log_tail": (result.stdout or "").strip().splitlines()[-14:],
-        "detect_to_recover_seconds": None,
     }
     # Timings parsed from the deploy records written by upgrade.sh/rollback.sh.
     records = sorted((FIELD_DIR / "logs").glob("*.json"))
@@ -598,6 +606,12 @@ def phase_broken_release(report: dict) -> None:
         raise RuntimeError(
             f"broken release did not fail the way it must (exit {result.returncode}); "
             "the gate is not protecting the deployment."
+        )
+    if not env_restored:
+        raise RuntimeError(
+            "the rollback did not restore the environment file: DATABASE_URL still "
+            "points at the unreachable host, so configuration is not actually part of "
+            "the rollback contract"
         )
     if healthy_after["mode"] == "000":
         raise RuntimeError("after the rollback the API is not answering")

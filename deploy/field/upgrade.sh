@@ -32,6 +32,7 @@ TO_IMAGE=""
 SKIP_SNAPSHOT=0
 AUTO_ROLLBACK=1
 WAIT_SECONDS=420
+CONFIG_PATCH=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -40,6 +41,7 @@ while [ $# -gt 0 ]; do
     --skip-snapshot) SKIP_SNAPSHOT=1; shift ;;
     --no-auto-rollback) AUTO_ROLLBACK=0; shift ;;
     --wait) WAIT_SECONDS="${2:?--wait needs seconds}"; shift 2 ;;
+    --config-patch) CONFIG_PATCH="${2:?--config-patch needs a file}"; shift 2 ;;
     -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -77,6 +79,34 @@ ENV_SNAPSHOT="${BACKUP_DIR}/$(date -u +%Y%m%dT%H%M%SZ)-pre-${TO_VERSION}.env"
 cp "${REPO_ROOT}/.env" "${ENV_SNAPSHOT}"
 chmod 600 "${ENV_SNAPSHOT}" 2>/dev/null || true
 log "Environment snapshot: ${ENV_SNAPSHOT} (contains secrets; rotated with the backups)"
+
+# The release's own configuration changes, applied AFTER the snapshots so a
+# rollback undoes them too. Shipping settings with the release (rather than
+# editing .env by hand before upgrading) is what makes "roll back the release"
+# a complete sentence: without this ordering, a bad setting is snapshotted as
+# the thing to restore to, and the rollback faithfully reinstates the breakage.
+if [ -n "${CONFIG_PATCH}" ]; then
+  [ -f "${CONFIG_PATCH}" ] || die "config patch ${CONFIG_PATCH} not found."
+  patch_keys="$(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' "${CONFIG_PATCH}" || true)"
+  log "Applying release config patch: ${patch_keys} key(s) (values never logged)"
+  while IFS= read -r line || [ -n "${line}" ]; do
+    case "${line}" in ''|\#*) continue ;; esac
+    key="${line%%=*}"
+    case "${key}" in
+      [A-Za-z_]*) ;;
+      *) die "config patch contains an invalid key: ${key}" ;;
+    esac
+    case "${key}" in
+      *[!A-Za-z0-9_]*) die "config patch contains an invalid key: ${key}" ;;
+    esac
+    tmp_env="$(mktemp)"
+    grep -v "^${key}=" "${REPO_ROOT}/.env" > "${tmp_env}" || true
+    printf '%s\n' "${line}" >> "${tmp_env}"
+    cat "${tmp_env}" > "${REPO_ROOT}/.env"
+    rm -f "${tmp_env}"
+    log "  patched ${key}"
+  done < "${CONFIG_PATCH}"
+fi
 
 set_api_image "${TO_IMAGE}"
 log "Recreating the API container on the new image"
