@@ -59,6 +59,12 @@ detect_python() {
     [ -n "${candidate}" ] || continue
     if ${candidate} -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; then
       PYTHON="${candidate}"
+      # Exported so child processes (and any script this one shells out to) see
+      # the same interpreter. Note the trap this closes: detect_python called
+      # from inside a command substitution sets PYTHON only in that subshell,
+      # so a script that later uses ${PYTHON} in its own shell must call
+      # detect_python itself first — every script in this kit does.
+      export PYTHON
       return 0
     fi
   done

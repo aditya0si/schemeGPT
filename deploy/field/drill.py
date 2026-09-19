@@ -550,11 +550,19 @@ def phase_broken_release(report: dict) -> None:
     log(f"PHASE C: ship a broken release ({BROKEN_VERSION}) and require a rollback")
     healthy_before = {"mode": ask()["mode"], "status": ops_status()}
 
-    # Build the bad release: same image, one broken setting. This is the most
-    # common real failure — not a bad binary, a bad configuration value shipped
-    # with it — and it is exactly what an automated rollback has to survive.
-    set_env("EMBEDDING_MODEL", "intfloat/this-model-does-not-exist-on-purpose")
-    log("Injected EMBEDDING_MODEL=intfloat/this-model-does-not-exist-on-purpose")
+    # Build the bad release: same image, one broken setting — a database
+    # connection string that points nowhere, which is both realistic (config
+    # travels with the release) and decisive (the API cannot pass its own
+    # /health probe, so the gate must catch it).
+    #
+    # Deliberately NOT a bad EMBEDDING_MODEL: embeddings load lazily, so the API
+    # would report healthy and keep answering in degraded mode. The drill would
+    # then be testing nothing while claiming to test the gate.
+    set_env(
+        "DATABASE_URL",
+        "postgresql+psycopg2://scheme:scheme@db-does-not-exist:5432/schemegpt",
+    )
+    log("Injected a broken DATABASE_URL (host db-does-not-exist)")
 
     started = time.time()
     result = run(
@@ -864,8 +872,10 @@ def write_evidence(report: dict) -> Path:
     if c:
         sections.append(
             "## C — Deliberately broken release\n\n"
-            f"- shipped with a bad `EMBEDDING_MODEL`; upgrade exited **{c['exit_code']}** "
-            f"(expected `{c['expected_exit_code']}`) after {c['seconds']}s\n"
+            f"- shipped with a bad `DATABASE_URL` (host `db-does-not-exist`), so the API "
+            f"cannot pass its own `/health` probe\n"
+            f"- upgrade exited **{c['exit_code']}** (expected `{c['expected_exit_code']}`) "
+            f"after {c['seconds']}s\n"
             f"- automatic rollback left the API on version `{c['rolled_back_to_version']}`, "
             f"answering `{c['healthy_after_rollback']}`\n"
         )

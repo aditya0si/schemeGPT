@@ -19,6 +19,10 @@
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+# See upgrade.sh: the interpreter must be resolved in this shell, because the
+# helpers resolve it inside subshells that cannot hand the value back.
+detect_python
+
 TO_VERSION=""
 TO_IMAGE=""
 WAIT_SECONDS=420

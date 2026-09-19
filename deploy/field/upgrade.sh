@@ -21,6 +21,12 @@
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+# Resolve the interpreter in THIS shell, not inside a command substitution:
+# helpers such as http_json/deploy_record call detect_python in a subshell, whose
+# variable assignments do not come back, and `${PYTHON}` here would then be
+# unbound under `set -u`.
+detect_python
+
 TO_VERSION=""
 TO_IMAGE=""
 SKIP_SNAPSHOT=0
@@ -113,11 +119,15 @@ else
   warn "Vector row count unavailable on one side; treating data integrity as unverified."
 fi
 
-OPS_SUMMARY="$(http_json "${API_URL}/ops/status" 5)"
-REPORTED_VERSION="$("${PYTHON}" -c 'import json,sys; print(json.loads(sys.stdin.read() or "{}").get("version","unknown"))' <<<"${OPS_SUMMARY}" 2>/dev/null || echo unknown)"
-log "Reporting version: ${REPORTED_VERSION} (expected ${TO_VERSION})"
-
+# Record what is deployed before any cosmetic reporting: if a later step has a
+# problem, the deploy state must still say what is actually running.
 write_deployed_state "${TO_VERSION}" "${TO_IMAGE}" "${FROM_VERSION}" "${FROM_IMAGE}"
+
+OPS_SUMMARY="$(http_json "${API_URL}/ops/status" 5)"
+REPORTED_VERSION="$(printf '%s' "${OPS_SUMMARY}" | \
+  "${PYTHON}" -c 'import json,sys; print(json.loads(sys.stdin.read() or "{}").get("version","unknown"))' \
+  2>/dev/null || echo unknown)"
+log "Reporting version: ${REPORTED_VERSION} (expected ${TO_VERSION})"
 RECORD="$(deploy_record upgrade "{\"from_version\": \"${FROM_VERSION}\", \"to_version\": \"${TO_VERSION}\", \"to_image\": \"${TO_IMAGE}\", \"health_seconds\": ${HEALTH_SECONDS}, \"smoke\": \"${SMOKE_RESULT}\", \"vectors_before\": ${VECTORS_BEFORE}, \"vectors_after\": ${VECTORS_AFTER}, \"data_intact\": ${DATA_OK}, \"snapshot\": \"${SNAPSHOT}\", \"reported_version\": \"${REPORTED_VERSION}\", \"started_at\": \"${STARTED_AT}\"}")"
 
 cat <<MSG
