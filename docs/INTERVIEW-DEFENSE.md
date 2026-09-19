@@ -287,10 +287,27 @@ The counters separate failures from refusals, so the customer can see how many
 calls were never wasted.
 
 **Q: Is the data leaving the customer network?**
-Retrieved policy text and the question go to the provider. Profile data,
-identifiers and access tokens do not: profile fields are a bounded subset, the
-access token is stored only as a SHA-256 hash, and no PII appears in metrics.
-With generation disabled, nothing leaves at all.
+
+Retrieved policy excerpts, the question, the fixed system prompt, and — only
+when the request attaches a profile — the profile block the caller supplied.
+The service renders that block into the prompt (`_build_profile_context` and
+`HUMAN_TEMPLATE` in `app/rag.py`), so "the model never sees profile fields"
+would be false, and correcting that claim is the first thing I did in my own
+engagement packet (`docs/engagement/03-security-packet.md`, section 3). What
+does **not** leave: access tokens (accepted by header on the profile endpoints
+only, stored as a SHA-256 hash, with no outbound code path able to read them),
+profile ids, admin tokens, the corpus and vector store (embedding runs
+in-process, `intfloat/multilingual-e5-small`), feedback records, application
+logs (exception types and operator actions only, never question or profile
+text) and metrics. Retrieval, embeddings and caching are local, so the only
+egress is the generation call. With generation disabled — kill switch, breaker
+open, or no key — nothing leaves at all and answers still cite retrieved
+sources.
+
+The pilot default is to disable profile collection client-side, which takes the
+profile store out of the data flow entirely; if a customer wants profiles
+enabled, that is their explicit decision, and `display_name` should be left
+blank because it is free text and the field most likely to carry a real name.
 
 **Q: Show me something that surprised you.**
 The deployment pin in `.env` crashing the app through pydantic-settings'
