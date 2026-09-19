@@ -44,11 +44,25 @@ log()  { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 warn() { printf '[%s] WARN: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 die()  { printf '[%s] FATAL: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; exit 1; }
 
-# The kit is Python-assisted (preflight, JSON records); require it once.
+# The kit is Python-assisted (preflight, JSON records); require a *working* one.
 detect_python() {
-  if command -v python3 >/dev/null 2>&1; then PYTHON=python3
-  elif command -v python >/dev/null 2>&1; then PYTHON=python
-  else die "python3 is required by the field kit (preflight, deploy records)."; fi
+  # Windows makes this non-obvious: `python3` can resolve to the Microsoft Store
+  # alias stub, which exists on PATH, prints "Python was not found" and does not
+  # run — so `command -v` is not evidence. Execute each candidate instead, and
+  # honour an explicit override (a deployment usually has a venv):
+  #   export SCHEMEGPT_PYTHON=./.venv/Scripts/python.exe
+  if [ -n "${PYTHON:-}" ] && ${PYTHON} -c 'import sys' >/dev/null 2>&1; then
+    return 0
+  fi
+  local candidate
+  for candidate in "${SCHEMEGPT_PYTHON:-}" python3 python "py -3"; do
+    [ -n "${candidate}" ] || continue
+    if ${candidate} -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; then
+      PYTHON="${candidate}"
+      return 0
+    fi
+  done
+  die "no working Python 3.9+ interpreter found (on Windows 'python3' is often the Microsoft Store alias stub, which exists but does not run). Install Python or set SCHEMEGPT_PYTHON=/path/to/python3."
 }
 
 compose() {
@@ -57,9 +71,11 @@ compose() {
   #   state/deploy.env     deployment pinning written by this kit (image refs).
   # Keeping them apart means the app never sees deployment plumbing, and this
   # kit never rewrites a file that holds customer secrets.
-  local args=(--project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" \
-              --env-file "${REPO_ROOT}/.env")
-  [ -f "${STATE_DIR}/deploy.env" ] && args+=(--env-file "${STATE_DIR}/deploy.env")
+  # Paths are converted for the native docker CLI (see to_native_path).
+  local args=(--project-name "${PROJECT_NAME}" -f "$(to_native_path "${COMPOSE_FILE}")" \
+              --env-file "$(to_native_path "${REPO_ROOT}/.env")")
+  [ -f "${STATE_DIR}/deploy.env" ] && \
+    args+=(--env-file "$(to_native_path "${STATE_DIR}/deploy.env")")
   docker compose "${args[@]}" "$@"
 }
 
@@ -81,13 +97,19 @@ compose_up_frontends() {
 
 now_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+to_native_path() {
+  # A path that bash understands is not always a path that Python understands:
+  # git-bash/MSYS hands out /c/Users/... while native Windows Python needs
+  # C:/Users/.... cygpath -m converts between them; on Linux cygpath is absent
+  # and the path is already native, so the helper is a pass-through there.
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
+}
+
 json_write() {
-  # json_write <path> <python-expression producing a dict>
-  # The expression receives `data` (a dict built by the caller through env vars
-  # is awkward in bash), so callers pass a JSON string instead.
+  # json_write <path> <json-string>
   local path="$1" payload="$2"
   detect_python
-  "${PYTHON}" - "$path" "$payload" <<'PY'
+  "${PYTHON}" - "$(to_native_path "${path}")" "$payload" <<'PY'
 import json, sys, pathlib
 path, payload = sys.argv[1], sys.argv[2]
 try:
@@ -213,7 +235,7 @@ read_state_field() {
   local field="$1" file="${STATE_DIR}/deployed.json"
   [ -f "${file}" ] || { echo ""; return 0; }
   detect_python
-  "${PYTHON}" - "$file" "$field" <<'PY'
+  "${PYTHON}" - "$(to_native_path "${file}")" "$field" <<'PY'
 import json, sys, pathlib
 data = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 value = data.get(sys.argv[2], "")

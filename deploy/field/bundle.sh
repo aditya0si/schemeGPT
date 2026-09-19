@@ -64,10 +64,10 @@ if [ "${DO_BUILD}" -eq 1 ]; then
   log "Building API image ${API_IMAGE} (GIT_SHA=${GIT_SHA:0:12})"
   docker build \
     --build-arg "GIT_SHA=${GIT_SHA}" \
-    -t "${API_IMAGE}" "${REPO_ROOT}"
+    -t "${API_IMAGE}" "$(to_native_path "${REPO_ROOT}")"
   if [ "${WITH_WEB}" -eq 1 ]; then
     log "Building web image ${WEB_IMAGE}"
-    docker build -t "${WEB_IMAGE}" "${REPO_ROOT}/web"
+    docker build -t "${WEB_IMAGE}" "$(to_native_path "${REPO_ROOT}/web")"
   fi
 fi
 
@@ -96,7 +96,7 @@ done
 [ "${WITH_WEB}" -eq 1 ] && MANIFEST_IMAGES="${MANIFEST_IMAGES} web=${WEB_IMAGE}"
 
 detect_python
-"${PYTHON}" - "${BUNDLE_DIR}" "${VERSION}" "${GIT_SHA}" "${GIT_DIRTY}" ${MANIFEST_IMAGES} <<'PY'
+"${PYTHON}" - "$(to_native_path "${BUNDLE_DIR}")" "${VERSION}" "${GIT_SHA}" "${GIT_DIRTY}" ${MANIFEST_IMAGES} <<'PY'
 import hashlib, json, pathlib, subprocess, sys, datetime
 
 bundle = pathlib.Path(sys.argv[1])

@@ -345,6 +345,20 @@ def set_pinned_image(reference: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_deployed_state(version: str, image: str, previous: str = "", previous_image: str = "") -> None:
+    """Mirror what install.sh/upgrade.sh record, so the drill is reproducible."""
+    state_dir = FIELD_DIR / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": version,
+        "image": image,
+        "previous_version": previous,
+        "previous_image": previous_image,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    (state_dir / "deployed.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def image_exists(reference: str) -> bool:
     if DRY_RUN:
         return True
@@ -388,6 +402,9 @@ def phase_install_baseline(report: dict) -> None:
     health_seconds = wait_healthy(timeout=1500)
     status, ops = http("GET", "/ops/status")
     smoke = ask()
+    # Record what is deployed, exactly as install.sh does. Without this the
+    # next upgrade has no "from" version and its rollback target is guesswork.
+    write_deployed_state(f"schemegpt:{BASELINE_VERSION}", f"schemegpt:{BASELINE_VERSION}")
     report["A_install_baseline"] = {
         "image": f"schemegpt:{BASELINE_VERSION}",
         "health_seconds": health_seconds,
@@ -413,7 +430,7 @@ def phase_upgrade(report: dict) -> None:
     result = run(
         [
             "bash",
-            str(FIELD_DIR / "upgrade.sh"),
+            sh_script(FIELD_DIR / "upgrade.sh"),
             "--to-version",
             RELEASE_VERSION,
             "--wait",
@@ -454,7 +471,7 @@ def phase_broken_release(report: dict) -> None:
     result = run(
         [
             "bash",
-            str(FIELD_DIR / "upgrade.sh"),
+            sh_script(FIELD_DIR / "upgrade.sh"),
             "--to-version",
             BROKEN_VERSION,
             "--to-image",

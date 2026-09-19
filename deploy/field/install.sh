@@ -119,7 +119,7 @@ PREFLIGHT_ARGS+=(--json "${REPORTS_DIR}/preflight-install-$(date -u +%Y%m%dT%H%M
 PREFLIGHT_EXIT=0
 if [ "${RUN_PREFLIGHT}" -eq 1 ]; then
   log "Running host preflight"
-  "${PYTHON}" "${FIELD_DIR}/preflight.py" "${PREFLIGHT_ARGS[@]}" || PREFLIGHT_EXIT=$?
+  "${PYTHON}" "$(to_native_path "${FIELD_DIR}/preflight.py")" "${PREFLIGHT_ARGS[@]}" || PREFLIGHT_EXIT=$?
   if [ "${PREFLIGHT_EXIT}" -eq 1 ]; then
     die "preflight found blockers; fix them or re-run with --skip-preflight (not recommended)."
   fi
