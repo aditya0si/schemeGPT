@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     # the deployed commit; see deploy/field/).
     git_sha: str = ""
 
+    # --- Provider call bounds -------------------------------------------
+    # Measured, not guessed: with the defaults the SDK applies (no timeout, two
+    # retries with backoff), a provider that accepts the connection and then
+    # goes silent left a citizen request hanging for ~150s before the fallback
+    # ran. A helpdesk answer that takes two and a half minutes is worse than a
+    # degraded answer that takes twenty seconds, so the call is bounded here and
+    # the circuit breaker does the rest.
+    groq_timeout_s: float = 20.0
+    groq_max_retries: int = 0
+
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",

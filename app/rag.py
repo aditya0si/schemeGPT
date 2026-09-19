@@ -457,6 +457,9 @@ def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
     # POST /ops/provider. Empty means "use the client's default endpoint".
     base_url = operator.provider_base_url()
     extra = {"groq_api_base": base_url} if base_url else {}
+    # Bound the provider call: a request must fail (and therefore fall back to a
+    # retrieval-only answer) in bounded time, never hang. See app/config.py for
+    # the measurement behind these defaults.
     return ChatGroq(
         model=model,
         api_key=key,
@@ -465,6 +468,8 @@ def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
         # never consume unbounded output tokens. langchain-groq (pinned 0.3.5)
         # accepts this as a standard init arg.
         max_tokens=max_tokens,
+        request_timeout=settings.groq_timeout_s,
+        max_retries=settings.groq_max_retries,
         **extra,
     )
 

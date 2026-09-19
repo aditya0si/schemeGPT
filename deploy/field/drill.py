@@ -834,19 +834,38 @@ def phase_no_egress(report: dict, stub: Stub) -> None:
     stub.mode("ok")
     time.sleep(1)
     final = ask()
+    statuses = [r["status"] for r in results]
     report["F_no_egress"] = {
+        "http_statuses": statuses,
         "answer_modes": [r["mode"] for r in results],
+        "first_answer_seconds": results[0]["elapsed_s"],
+        "slowest_answer_seconds": max(r["elapsed_s"] for r in results),
         "sources_returned": worst["sources"],
-        "answer_seconds": worst["elapsed_s"],
         "quotes": quotes,
         "stream_done_mode": (streamed.get("done") or {}).get("mode"),
         "recovered_mode": final["mode"],
     }
-    if any(r["mode"] == "000" for r in results):
-        raise RuntimeError("the API stopped answering when the provider was unreachable")
+    # Assert on the HTTP status, not just the answer mode: an earlier version of
+    # this phase recorded four non-answers (mode None, zero sources) and still
+    # "passed", because it only looked at `mode`. The API must answer — in
+    # degraded mode, in bounded time — or this is a failed rehearsal.
+    if any(status != 200 for status in statuses):
+        raise RuntimeError(
+            f"the API did not answer with the provider unreachable (statuses {statuses}); "
+            "a dead provider must degrade, not hang"
+        )
+    if not any(mode == "degraded" for mode in report["F_no_egress"]["answer_modes"]):
+        raise RuntimeError(
+            "no degraded answer was served with no egress: "
+            f"{report['F_no_egress']['answer_modes']}"
+        )
+    if quotes["cited"] and quotes["verified"] != quotes["cited"]:
+        raise RuntimeError(f"degraded answers contained unverifiable citations: {quotes}")
     log(
-        f"PHASE F done: modes {report['F_no_egress']['answer_modes']}, "
-        f"citations verified {quotes['verified']}/{quotes['cited']}"
+        f"PHASE F done: statuses {statuses}, modes "
+        f"{report['F_no_egress']['answer_modes']}, first answer in "
+        f"{results[0]['elapsed_s']}s, citations verified "
+        f"{quotes['verified']}/{quotes['cited']}"
     )
 
 
@@ -957,7 +976,9 @@ def write_evidence(report: dict) -> Path:
     if f_block:
         sections.append(
             "## F — No egress at all\n\n"
-            f"- answer modes while unreachable: `{f_block['answer_modes']}`\n"
+            f"- HTTP statuses while unreachable: `{f_block['http_statuses']}`; first answer in "
+            f"{f_block['first_answer_seconds']}s, slowest {f_block['slowest_answer_seconds']}s\n"
+            f"- answer modes: `{f_block['answer_modes']}`\n"
             f"- retrieval still returned {f_block['sources_returned']} sources; "
             f"citations verified {f_block['quotes']['verified']}/{f_block['quotes']['cited']}\n"
             f"- SSE `done.mode = {f_block['stream_done_mode']}`; "

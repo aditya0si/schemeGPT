@@ -387,6 +387,28 @@ def test_fallback_answer_uses_demo_when_retrieval_fails(monkeypatch, tmp_path):
     assert controller.ai_enabled is True
 
 
+# --- provider call bounds -----------------------------------------------------
+# Measured in the no-egress rehearsal: with the SDK's own defaults (no timeout,
+# two retries with backoff) a provider that accepts the connection and then goes
+# silent left requests hanging for ~150s before the retrieval-only fallback ran.
+# The client is bounded now, and this test keeps it that way.
+
+
+def test_llm_client_bounds_the_provider_call(monkeypatch):
+    from app import rag
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "groq_api_key", "test-key-not-used")
+    llm = rag.get_llm()
+
+    assert llm.request_timeout == settings.groq_timeout_s
+    assert llm.max_retries == settings.groq_max_retries
+    # A citizen-facing answer must degrade in bounded time; anything above a
+    # minute is indistinguishable from an outage to the person waiting.
+    assert settings.groq_timeout_s <= 60
+    assert settings.groq_max_retries <= 1
+
+
 # --- operator state vs the semantic cache -------------------------------------
 # The two refusal reasons deliberately differ. A human stopping generation must
 # stop *serving* generated text, so a cached live answer is not replayed; a
