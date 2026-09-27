@@ -66,8 +66,10 @@ def count_generation_vectors(generation: str) -> int:
 async def lifespan(app: FastAPI):
     # Idempotent on every startup: CREATE TABLE IF NOT EXISTS + empty-check.
     profiles.init_table()
-    if count_vectors() == 0:
-        ingest.ingest()
+    vectors = count_vectors()
+    if vectors == 0:
+        if settings.enable_auto_ingest:
+            ingest.ingest()
     else:
         # Vectors exist: readiness rejects model or generation drift rather
         # than silently comparing embeddings from incompatible spaces.
@@ -77,9 +79,10 @@ async def lifespan(app: FastAPI):
                 "Vector store embedding model does not match configuration. "
                 "Run: python scripts/reembed.py"
             )
-    from app.db import ensure_fts_index
+    if vectors > 0 or settings.enable_auto_ingest:
+        from app.db import ensure_fts_index
 
-    ensure_fts_index()
+        ensure_fts_index()
     yield
 
 
@@ -187,8 +190,10 @@ def ingest_docs(x_admin_token: str = Header(default="")):
     Protected by the ``X-Admin-Token`` header, compared in constant time with
     the configured ``ADMIN_TOKEN``. When no ``ADMIN_TOKEN`` is configured the
     endpoint is disabled with a clear 503 response: manual re-ingestion must
-    not be exposed publicly. Startup auto-ingestion is unchanged and still runs
-    (idempotently) when the vector store is empty. Tokens are never logged.
+    not be exposed publicly. Startup auto-ingestion is controlled by
+    ``ENABLE_AUTO_INGEST`` and runs
+    (idempotently) when enabled and the vector store is empty. Tokens are
+    never logged.
     """
     if not settings.admin_token.strip():
         raise HTTPException(

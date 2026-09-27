@@ -41,3 +41,5 @@ services:
         sync: false
       - key: DATA_DIR
         value: data
+      - key: ENABLE_AUTO_INGEST
+        value: "false"

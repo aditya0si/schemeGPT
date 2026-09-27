@@ -31,9 +31,12 @@ class Settings(BaseSettings):
     # separate per-model daily-token bucket on the free tier.
     eval_judge_model: str = ""
     data_dir: str = "data/schemes"
+    # Populate an empty vector store during startup. Disable this for the
+    # model-free demo image, which serves labelled fallback answers and must
+    # not load the embedding model on a 512 MB instance.
+    enable_auto_ingest: bool = True
     # Admin token required for POST /ingest via the X-Admin-Token header.
-    # Leave blank to disable manual re-ingestion (startup auto-ingestion is
-    # unchanged and still runs when the vector store is empty).
+    # Leave blank to disable manual re-ingestion.
     admin_token: str = ""
     # Comma-separated list of browser origins allowed by CORS. The Streamlit
     # web UI talks to the API server-side (no browser CORS), so only origins

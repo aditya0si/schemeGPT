@@ -16,7 +16,8 @@ RUN pip install --no-cache-dir \
 
 # Render free tier (512 MB RAM) runs in labelled demo mode when GROQ_API_KEY
 # is unset, so we skip baking the multilingual-e5-small embedding model into
-# the image. The model is loaded lazily only if live answers are requested.
+# the image. render.yaml disables startup ingestion so the model is loaded
+# lazily only if a live answer is requested.
 
 COPY app ./app
 COPY data ./data
