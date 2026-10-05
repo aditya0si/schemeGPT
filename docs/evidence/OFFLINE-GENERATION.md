@@ -4,12 +4,18 @@
 
 This document does **not** establish a generation-quality baseline, and none of
 the rates below is a quality signal. The only capture available is degenerate:
-**1 of its 8 cases is grounded**, and the other 7 never retrieved a source
-because the provider credential was rejected and the pipeline returned a
-pre-made demo fallback. Those 7 cases sit in every denominator, so the
-aggregate rates (`quote verification 0.50`, `citation coverage 0.25`) measure
-the archive's failure mode, not the generator. The numbers are published
-because the mechanism is real and CI-gated; the quality claim is not.
+**1 of its 8 cases is grounded**, and the other 7 never retrieved a source and
+returned a pre-made demo fallback instead. The archive does not record **why**
+those 7 fell back, so no cause is asserted here — in particular a rejected
+credential must not be inferred. Case 0 is a genuine live answer whose judge
+calls were throttled with `RateLimitError` (HTTP 429) *"on tokens per day
+(TPD): Limit 200000, Used 199911"*, naming organization
+`org_01ks7njm54ehm9mbfdc97rda95`; that proves the credential **authenticated**
+on 2026-09-01 and was merely rate-limited. Those 7 cases sit in every
+denominator, so the aggregate rates (`quote verification 0.50`,
+`citation coverage 0.25`) measure the archive's failure mode, not the
+generator. The numbers are published because the mechanism is real and
+CI-gated; the quality claim is not.
 
 What the measurement *does* establish is the mechanism: a keyless,
 network-free, CI-gated check that a quoted line in an archived answer is an
@@ -51,23 +57,31 @@ Cases 1–7 all carry the same archive error:
 Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
 ```
 
+That line is the old harness's own message: it named a credential for *every*
+provider failure, so it is not an independent record of the cause. The archive
+stores no provider error for cases 1–7, and this document therefore does not
+claim one. (Case 0's separate `error` field *does* record a provider error, and
+it is a throttle, not a rejection; see below.)
+
 Case 3's lone `>` line is not a generated citation; it is a stray line left
 inside a demo-fallback answer, and it is the second of the two quote lines that
 the metric folds in. Case 0 is the only case whose answer is absent from the
 demo corpus and carries retrieved sources, so it is the only answer that could
 ever ground.
 
-### Credential-failure timeline
+### Credential-validity timeline
 
 | Date | Observation | Where |
 | --- | --- | --- |
-| 2026-09-01 | 7 of 8 archived cases carry the demo-fallback error naming the credential | `eval/results/scores.json` (`generated_at`) |
-| 2026-10-05 | an independent probe of the credential returned `401 Invalid API Key` | this repository's offline work log |
+| 2026-09-01 | case 0 carries an authenticated-org throttle: `RateLimitError` HTTP 429 on tokens per day, org `org_01ks7njm54ehm9mbfdc97rda95`, `Used 199911` of `Limit 200000` | `eval/results/scores.json` (case 0 `error`) |
+| 2026-10-05 | a read-only models probe with the ambient credential returned `HTTP 401` code `invalid_api_key` | this repository's offline work log |
 
-The archive names the same credential cause on 2026-09-01 that a direct probe
-confirms on 2026-10-05, five weeks apart. Across that window no capture
-demonstrates live generation beyond the single case-0 answer. Any capture taken
-while the credential is rejected is degenerate by definition.
+The credential **authenticated** on 2026-09-01 — it was throttled on the free
+tier's daily token cap, not rejected — and it is **invalid** on 2026-10-05. The
+change happened somewhere in that roughly five-week window; the exact date is
+not recorded in the archive and is not claimed here. Because the archive
+records no provider error for the 7 fallbacks, that window is the only
+credential statement the evidence supports.
 
 ## Measured result (2026-10-05, this host, over the committed fixture)
 
@@ -114,9 +128,9 @@ are not a quality signal say so directly.
 | Sources | the archive's retrieved source metadata, each carrying its chunk `content` |
 
 The archive is a single real run, but it is a degenerate capture: only case 0
-was answered live; the other 7 are demo fallbacks recorded by the same run
-because the credential was rejected. It is not "the production pipeline
-retrieved and generated over all the archived cases".
+was answered live; the other 7 are demo fallbacks recorded by the same run. The
+archive does not record the cause of those 7 fallbacks. It is not "the
+production pipeline retrieved and generated over all the archived cases".
 
 The archive's RAGAS score fields (`faithfulness`, `answer_relevancy`,
 `context_precision`, `context_recall`) are all `None` — the judge experiment

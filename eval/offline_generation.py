@@ -24,10 +24,12 @@ Two measurements are reported per case and in aggregate:
     citation-label contract.
 
 The archived fixture is a live-run capture dated 2026-09-01, but that first
-capture is degenerate: the credential was rejected ("Live RAG returned demo
-fallback; provide a valid GROQ_API_KEY") and 7 of its 8 cases are demo
-fallbacks with no retrieved sources. Only case 0 (``pmjay-cover``) is a real
-live answer. The aggregate rates therefore sit over a denominator that mostly
+capture is degenerate: 7 of its 8 cases are demo fallbacks with no retrieved
+sources, and the archive does not record why they fell back. Only case 0
+(``pmjay-cover``) is a real live answer. Case 0's ``error`` records an
+authenticated-org throttle (``RateLimitError`` HTTP 429 on tokens per day), so
+the credential authenticated that day and a rejected credential must not be
+inferred. The aggregate rates therefore sit over a denominator that mostly
 cannot ground a quote; they are regression tripwires, **not** generation-quality
 signals, and this document must not be read as a quality baseline.
 
