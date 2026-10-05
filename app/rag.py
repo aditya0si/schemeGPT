@@ -908,7 +908,16 @@ def answer(
             type(exc).__name__,
             " and opening the provider circuit" if opened else "",
         )
-        return fallback_answer(question, lang, profile, reason="provider_failure")
+        result = fallback_answer(question, lang, profile, reason="provider_failure")
+        # Carry the provider's own error identity -- the exception class and its
+        # HTTP status, never message text or secrets -- so a caller (the eval
+        # harness) can report *why* the fallback happened. Without this every
+        # provider failure is indistinguishable and gets misreported as a bad
+        # credential.
+        result["provider_error_type"] = type(exc).__name__
+        status = getattr(exc, "status_code", None)
+        result["provider_status_code"] = status if isinstance(status, int) else None
+        return result
     operator.record_provider_success()
 
     sources = [
