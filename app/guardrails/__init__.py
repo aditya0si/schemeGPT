@@ -1,13 +1,14 @@
-"""PII guardrails: the pure, offline detection core (Phase 6a).
+"""PII guardrails: the offline detection core and its reversible vault (6b).
 
-This package holds recognizers for Indian personal identifiers. It is
-intentionally isolated from the request path: nothing here is wired into the
-API, the vault, or the streaming pipeline yet (that is Phase 6b). Everything in
-:mod:`app.guardrails.recognizers` is a pure function over text.
+This package holds recognizers for Indian personal identifiers and the
+request-scoped vault that can hide them from a hosted provider and put them back
+afterwards. The recognizers are pure functions over text; the vault is
+in-memory only and never persisted, logged, or returned (see
+:mod:`app.guardrails.vault`).
 
 Import surface::
 
-    from app.guardrails import Match, find_all
+    from app.guardrails import Match, find_all, Vault
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from app.guardrails.recognizers import (
     verhoeff_check_digit,
     verhoeff_valid,
 )
+from app.guardrails.vault import Vault, restore, tokenize
 
 __all__ = [
     "KIND_AADHAAR",
@@ -44,6 +46,7 @@ __all__ = [
     "KIND_PAN",
     "KIND_UPI",
     "Match",
+    "Vault",
     "find_all",
     "is_aadhaar",
     "recognize_aadhaar",
@@ -53,7 +56,9 @@ __all__ = [
     "recognize_mobile",
     "recognize_pan",
     "recognize_upi",
+    "restore",
     "to_devanagari",
+    "tokenize",
     "verhoeff_check_digit",
     "verhoeff_valid",
 ]
