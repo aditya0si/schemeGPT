@@ -171,10 +171,14 @@ chunks), run `34847304948` (pull request) and its follow-up on `main`
 completed cases with 0 retrieval errors; each run uploads
 `retrieval_scores.json`. This is the measured result of those CI runs on that
 corpus generation, reproducible with `python -m eval.retrieval_gate` after
-ingest, not an ongoing production benchmark. Retrieval quality remains a tracked
-metric, not a solved problem: the two remaining misses are the PM-SYM Hinglish
-question and the unorganised-worker profile question, which have no lexical
-anchor.
+ingest, not an ongoing production benchmark. The frozen measurement — the exact
+command, the corpus generation and chunk count, the embedding model, the date,
+and an explicit statement of what is *not* claimed — is recorded in
+[`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
+quality remains a tracked metric, not a solved problem: the two remaining
+misses are the PM-SYM Hinglish question and the unorganised-worker profile
+question, which have no lexical anchor.
+
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
