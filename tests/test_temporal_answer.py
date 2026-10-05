@@ -76,6 +76,22 @@ def test_iso_string_and_date_agree():
     )
 
 
+def test_none_as_of_raises_value_error_naming_the_argument():
+    # Regression: this used to die deep in resolve_as_of with
+    # "TypeError: '<=' not supported between instances of 'datetime.date' and
+    # 'NoneType'". It must fail loudly and name the argument instead.
+    with pytest.raises(ValueError) as excinfo:
+        temporal_answer("FADCS rate", None)
+    assert "as_of" in str(excinfo.value)
+    assert "None" in str(excinfo.value)
+    assert not isinstance(excinfo.value, TypeError)
+
+
+def test_non_date_as_of_raises_value_error_naming_the_argument():
+    with pytest.raises(ValueError, match="as_of"):
+        temporal_answer("FADCS rate", 20210101)
+
+
 # --- fail-closed branches (R4) ------------------------------------------------
 
 

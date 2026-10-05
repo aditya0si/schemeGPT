@@ -30,8 +30,15 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
-from app.config import ROOT_DIR
 from app.temporal import DatedClaim, claim_from_dict, resolve_as_of
+
+# Repo root, derived locally rather than imported from ``app.config``: the
+# as-of path is a pure stdlib function of a data file, so importing the
+# pydantic-backed settings module (and reading .env) would be needless weight
+# on the request path and would drag a runtime dependency into the keyless
+# offline gate. ``parents[1]`` is the same directory ``app.config.ROOT_DIR``
+# computes.
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 # Response mode for every as-of payload (grounded or refused). Callers can
 # distinguish an era-resolved answer from a live/degraded/demo one.
@@ -324,7 +331,19 @@ def temporal_answer(
     Returns the normal ``/query`` payload shape (``answer``, ``sources``,
     ``mode="as_of"``, ``notice``, ``language``) plus empty ``quotes``/``steps``.
     Refusals carry the same shape with an explanatory answer and no sources.
+
+    ``as_of`` is required. It must be a :class:`datetime.date` or an ISO
+    ``YYYY-MM-DD`` string; anything else (notably ``None``) raises
+    :class:`ValueError` naming the argument, rather than failing deep inside
+    :func:`app.temporal.resolve_as_of` with an opaque ``TypeError``. Both
+    production call sites guard with ``if as_of is not None``, so this only
+    changes behaviour for a direct, unguarded call.
     """
+    if not isinstance(as_of, (date, str)):
+        raise ValueError(
+            "as_of is required: expected a datetime.date or an ISO "
+            f"'YYYY-MM-DD' string, got {type(as_of).__name__}"
+        )
     as_of_date = date.fromisoformat(as_of) if isinstance(as_of, str) else as_of
     lang = "hi" if str(language).strip().lower() == "hi" else "en"
     refuse = _hindi_refusal if lang == "hi" else _english_refusal

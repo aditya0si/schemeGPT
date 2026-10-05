@@ -36,6 +36,7 @@ def _redirect_evidence_writers(tmp_path, monkeypatch):
     import eval.pii_benchmark as pii_benchmark
     import eval.retrieval_gate as retrieval_gate
     import eval.run_eval as run_eval
+    import eval.temporal_gate as temporal_gate
 
     results = tmp_path / "eval" / "results"
     monkeypatch.setattr(run_eval, "RESULTS_DIR", results)
@@ -50,6 +51,13 @@ def _redirect_evidence_writers(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         pii_benchmark, "RESULTS_FILE", results / "pii_benchmark.json"
+    )
+    # temporal_gate also resolves its module constants at call time.
+    monkeypatch.setattr(
+        temporal_gate, "RESULTS_FILE", results / "temporal_scores.json"
+    )
+    monkeypatch.setattr(
+        temporal_gate, "REPORT_FILE", results / "temporal_report.md"
     )
 
     reports = tmp_path / "deploy" / "field" / "reports"
