@@ -45,8 +45,9 @@ finding explains why samjho's own adapter could not be reused for the latter.
 | Command | Result |
 | --- | --- |
 | `./.venv/Scripts/python.exe -m pytest tests/test_samjho_binding.py -q` | `15 passed` |
-| `./.venv/Scripts/python.exe -m pytest -q` | `464 passed, 1 skipped` (465 collected) |
-| `./.venv/Scripts/python.exe tools/check_claims.py` | `claims ok: tests=465 evidence=20` |
+| `./.venv/Scripts/python.exe -m pytest tests/test_samjho_gate_driver.py -q` | `20 passed` |
+| `./.venv/Scripts/python.exe -m pytest -q` | `484 passed, 1 skipped` (485 collected) |
+| `./.venv/Scripts/python.exe tools/check_claims.py` | `claims ok: tests=485 evidence=20` |
 
 The binding was driven only by stub callables whose signatures match samjho's
 frozen ones, returning `AnswerResult`-shaped pydantic models. The tests assert:
@@ -56,30 +57,73 @@ three answer paths survive with `path` intact; a refusal and a degraded result
 survive intact; and `citations` / `stripped_citations` map onto the
 validated-quote shape. No samjho module was imported at any point.
 
+The Phase 7c driver is tested the same way: its routing is exercised against
+signature-faithful stubs (the refusals and degraded results above), its adapter
+rebinding is asserted, and its gate exit-code propagation is asserted against a
+stand-in runner. No samjho module was imported there either.
+
+## The Phase 7c driver — routing the gate through the spine
+
+`clients/samjho/run_gate_through_spine.py` is the instrument Phase 7c asks for:
+it executes **samjho's own** `evals.run_eval` with samjho's own
+`evals.adapter.search` / `evals.adapter.answer` rebound to the spine. It imports
+samjho lazily (the module itself is stdlib + this repository only) and takes the
+frozen `api.answer` / `api.retriever` callables by the attribute names samjho's
+own adapter declares, binds them through `bind_samjho(...)`, and normalises the
+spine's payload with samjho's own `normalize_answer` / `normalize_hits` so the
+shape the harness consumes is unchanged.
+
+Its purpose is the decisive comparison: run samjho's gate **without** the spine
+and **with** it, over the same corpus, and compare the table. Identical metrics
+mean the spine is behaviour-preserving end-to-end; any difference is a finding
+about the binding, not something to hide. The driver therefore also prints a
+per-subject routing trace (`searches` / `answers` / `refused` / `degraded` /
+`paths`) so a difference can be localised.
+
+**Honesty:** the metrics are samjho's. The driver never recomputes or
+reinterprets a score — it only supplies the client responses through the spine
+and forwards samjho's gate exit code (`0` pass, `1` fail, `2` cannot run). The
+metric table it prints is samjho's own.
+
+The exact orchestration command (run from samjho's checkout root, inside
+samjho's venv, with SchemeGPT on `PYTHONPATH`):
+
+```bash
+cd C:/Users/oliad/Desktop/samjho
+PYTHONPATH="C:/Users/oliad/Desktop/SchemeGPT;C:/Users/oliad/Desktop/samjho" \
+    DATABASE_URL="postgresql://samjho:samjho@localhost:5439/samjho" \
+    .venv/Scripts/python.exe \
+    C:/Users/oliad/Desktop/SchemeGPT/clients/samjho/run_gate_through_spine.py
+```
+
+`DATABASE_URL` is the only required override: `api/config.py` defaults to port
+5432 while the measured corpus lives on 5439. The orchestrator should compare
+the printed table against the **without-spine baseline** measured on the same
+1,004-chunk corpus: `hit@4 1.000`, `MRR 0.869`, `page@4 1.000`, `citation hit
+0.914`, `golden acceptance 0.971`, `refusal accuracy 0.800` → `GATE PASSED`.
+
 ## What was NOT executed — the honest limit
 
-**samjho's own end-to-end gate was not run.** The plan's Phase 7 goal names
-`python -m evals.run_eval --subjects all` over `evals/golden/*.jsonl` and
-`evals/refusals.jsonl` as the instrument that proves the mapping. That command
-was **not** executed here and **no gate result is claimed**:
+**samjho's own end-to-end gate was not run by the author of these files.** The
+Phase 7c driver above exists to run it, but the author is sandboxed to this
+repository: samjho's source, venv and database are outside the workspace
+boundary, so the driver was only unit-tested against signature-faithful stubs.
+**No gate result is claimed here.** The driver is the deliverable; the run is
+the orchestrator's, and until it executes, the "what have we proven" question
+stays at: the binding maps every concept correctly, but the mapping has not met
+samjho's live 1,004-chunk corpus through the spine.
 
-- It needs samjho's Postgres with pgvector reachable at `localhost:5432`
-  (`api/config.py` defaults `DATABASE_URL` to
-  `postgresql://samjho:samjho@localhost:5432/samjho`) plus the ingested
-  textbook corpus, neither of which exists in this repository or on this host.
-- samjho's repository is outside this workspace boundary; only the read-only
-  reference copies staged at `.hermes/ref/samjho/` are available, and they are
-  not an installable package.
+The run is now *possible* outside this repository (the orchestrator reports an
+up pgvector instance on port 5439 with the corpus loaded), but it still needs a
+samjho checkout with `api/`, `evals/` and `data/`, and it must be launched from
+that checkout with `DATABASE_URL` pointed at 5439 (the command is in the Phase
+7c section above). `api/config.py` historically defaulted `DATABASE_URL` to
+`postgresql://samjho:samjho@localhost:5432/samjho`, which is why the override is
+required.
 
-To actually run it would require, outside this repository: a checkout of samjho
-with `api/`, `evals/` and `data/`; a running `pgvector` instance; `python -m
-api.db init && python -m api.db load corpus/chunks/*.jsonl`; and then
-`python -m evals.run_eval --subjects all`. Until that runs, the adapter is
-proven only against signature-faithful stubs, not against samjho's live corpus.
-
-Also **not** executed: samjho's written path against a real provider (the tests
-name a stub provider). The database-dependent and network-dependent paths are
-out of reach in this environment and nothing about them is asserted.
+Also **not** executed by the author: samjho's written path against a real
+provider (the wiring tests name a stub provider). Nothing about the live
+provider path is asserted here.
 
 ## Findings
 
@@ -111,9 +155,11 @@ out of reach in this environment and nothing about them is asserted.
 
 ```bash
 ./.venv/Scripts/python.exe -m pytest tests/test_samjho_binding.py -q
+./.venv/Scripts/python.exe -m pytest tests/test_samjho_gate_driver.py -q
 ./.venv/Scripts/python.exe -m pytest -q
 ./.venv/Scripts/python.exe tools/check_claims.py
 ```
 
-The samjho gate itself is **not** reproducible in this environment; see "What
-was NOT executed".
+The samjho gate itself is **not** reproducible in this repository's
+environment; see "What was NOT executed". The Phase 7c section names the
+command the orchestrator runs, outside this repository, to make it real.
