@@ -71,6 +71,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 - **FastAPI + Next.js 16**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 16 frontend and Streamlit demo.
 - **Bilingual EN/HI**: Native multi-lingual query understanding, cross-language vector retrieval, and localized UI controls.
 - **Quote-verified answers**: Deterministic exact substring validation preventing fabricated clauses, amounts, or guidelines.
+- **As-of answers (dated claims)**: Deterministic "what did this scheme say on <date>" answers over the rate ladders the corpus documents declare, returning the value in force on that date with the verbatim sentence it came from, and refusing outright — never substituting the current value — when the era cannot be established (79 of 2,105 documents declare any date).
 - **Operator control plane**: AI kill switch, provider circuit breaker, and runtime provider-endpoint override, so generation can be stopped, rerouted, or degraded to retrieval-only answers without taking the service down (`GET /ops/status`).
 - **Field deployment kit**: air-gap install bundle with checksums and signatures, host preflight doctor (TLS interception, clock skew, egress policy), upgrade with database+config snapshot, and a rehearsed automatic rollback (`deploy/field/`).
 
@@ -80,6 +81,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 - **Hybrid RRF Search**: Fuses pgvector cosine search, PostgreSQL `tsvector` keyword search, and a lexical scheme-name channel with Reciprocal Rank Fusion, then keeps one chunk per source for a source-diverse top-4.
 - **Exact Quote Verification**: Cross-references every generated statement against source Markdown chunks via strict substring matching.
+- **As-Of Answers**: Resolves "the value in force on <date>" from the effective dates a source document declares, cites the verbatim span, names the replacement and its date, and refuses honestly rather than substituting a current value — without a language model and without a point-in-time copy of the corpus.
 - **Multi-Step Agent Retrieval**: Executes iterative tool-calling sequences for comparative, multi-scheme, and constraint-heavy queries.
 - **Deterministic Profile Matching**: Recommends applicable welfare programs based on demographic, income, occupational, and location parameters without ungrounded LLM guessing.
 - **SSE Token Streaming**: Streams live answer tokens and intermediate agent search events via Server-Sent Events.
@@ -186,7 +188,7 @@ claimed — is recorded in
 [`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
 quality remains a tracked metric, not a solved problem.
 
-<!-- claims: tests=553 evidence=21 -->
+<!-- claims: tests=554 evidence=22 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
@@ -216,6 +218,23 @@ integration facts, and an explicit statement of what this does *not* measure
 (free-text profile fields, and a streaming guarantee proven against a stubbed
 provider rather than a real network audit) are recorded in
 [`docs/evidence/PII-BENCHMARK.md`](docs/evidence/PII-BENCHMARK.md).
+
+**Temporal (as-of) answers:** the deterministic "what did this scheme say on
+<date>" path reads the effective-dated values a source document declares and
+returns the one in force on the requested day, with the verbatim sentence it came
+from and the value that superseded it — no language model, no historical copy of
+the corpus. Its golden set is **derived, not hand-written**: 124 cases from 10
+ladders, regenerable byte-identically from a frozen artifact of 41 claims. Every
+consistency floor — as-of, boundary, supersession, refusal, and retrieval-gate
+invariance — measures **1.000**, and era-mixing **0.000**; the retrieval gate
+still reports 16/16 · Hit@4 0.875 · MRR@4 0.796875. The capability is
+deliberately narrow and the limits are published with the numbers: only **79 of
+2,105** documents declare any date (1,982 declare none), there is no
+per-document revision chain, and the gate is a **consistency** check that proves
+the code reflects the artifact, not that any ladder is correct. The frozen
+measurement, the question → claim → verbatim-span → source provenance chain, a
+worked FADCS example, and an explicit statement of the coverage ceiling are
+recorded in [`docs/evidence/TEMPORAL-GATE.md`](docs/evidence/TEMPORAL-GATE.md).
 
 **Cost engineering:** every LLM call is also a money event. Per-model token
 usage is tracked on `/metrics` alongside a USD **cost ledger** (`cost.total`,

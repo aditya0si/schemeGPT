@@ -321,3 +321,31 @@ Tasks 3–5 must therefore be built and tested against a **clearly-labelled
 synthetic history** for the bulk corpus, with the handful of declared-date
 documents used as the real regression anchors and the honest ceiling on
 achievable temporal accuracy stated alongside any synthetic number.
+
+## What was built on this inventory (2026-10-06)
+
+Task 0's decision — anchor only in declared dates, invent nothing — was carried
+through Tasks 1–4. The synthetic-history fallback named in the previous paragraph
+was **dropped** by the post-Task-0 amendment to the plan; the bulk corpus is not
+given an invented version chain. The findings above (79 `declared` / 44
+`inferred` / 1,982 `none`; the per-class table; the ladder table) are the
+measured basis and are unchanged.
+
+What now exists on top of this inventory:
+
+- **The claims artifact** —
+  [`eval/fixtures/temporal_claims.jsonl`](../../eval/fixtures/temporal_claims.jsonl):
+  41 effective-dated claims over the 10 source ladders, every one carrying a
+  verbatim `span` that a test proves literally appears in its named source.
+- **The answer path** — [`app/temporal.py`](../../app/temporal.py) (dated
+  claims, `resolve_as_of`, supersession chains) and
+  [`app/temporal_answer.py`](../../app/temporal_answer.py)
+  (`temporal_answer(question, as_of, language)`, `mode="as_of"`), which returns
+  the value in force on the requested date with its verbatim span, or refuses
+  without substituting a current value.
+- **The gate** — [`eval/temporal_gate.py`](../../eval/temporal_gate.py) and the
+  derived [`eval/fixtures/temporal_golden.jsonl`](../../eval/fixtures/temporal_golden.jsonl)
+  (124 cases from the same 10 ladders, regenerable byte-identically by
+  [`scripts/generate_temporal_golden.py`](../../scripts/generate_temporal_golden.py)).
+- **The published evidence** —
+  [`docs/evidence/TEMPORAL-GATE.md`](../evidence/TEMPORAL-GATE.md).

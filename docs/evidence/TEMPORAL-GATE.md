@@ -1,0 +1,227 @@
+# Temporal (as-of) gate — measured results
+
+Frozen evidence for the "answer as of a date" capability described in
+[`README.md`](../../README.md). Every number below is a measurement from a real
+run, not a target. The gate's machine-readable output
+(`eval/results/temporal_scores.json`) is intentionally git-ignored, so this
+document and [`eval/results/temporal_report.md`](../../eval/results/temporal_report.md)
+are the committed record.
+
+This is Phase 8 / track 1, Task 4 — the *publication* of the capability built in
+Tasks 0–3: [`docs/versioning/TEMPORAL-INVENTORY.md`](../versioning/TEMPORAL-INVENTORY.md)
+(Task 0, the inventory), `app/temporal.py` (Task 1, dated claims and as-of
+resolution), `app/temporal_answer.py` (Task 2, the answer path),
+`eval/temporal_gate.py` and `eval/fixtures/temporal_golden.jsonl` (Task 3, the
+derived golden set and the gate).
+
+## What the capability is
+
+You can ask a scheme question **as of a date in the past** — "what was the
+FADCS child allowance on 1 January 2021?" — and get the value that was in force
+on that exact date, together with the sentence from the source document that
+says so. The system does *not* look up a historical copy of a document: there
+are none. Instead it reads the dates the documents themselves declare (a value
+"w.e.f. 01.01.2020", a rate ladder that lists each change), works out which rung
+was in force on the requested day, and quotes that rung's verbatim span. When it
+cannot establish the era — a date before the first declared value, a question
+that names no dated scheme, or a missing claims record — it refuses and says so,
+and it never substitutes today's value for the past one. The answer path is
+deterministic: it reads a frozen artifact and calls no language model.
+
+## The measured numbers
+
+Exact command (the numbers below are from this run):
+
+```bash
+./.venv/Scripts/python.exe -m eval.temporal_gate --check-default-mode \
+    --output .hermes/reports/temporal_full_scores.json \
+    --report .hermes/reports/temporal_full_report.md
+```
+
+Verbatim one-line summary:
+
+```text
+Temporal gate: 124 golden cases (+1 probe), as_of=1.0, boundary=1.0, supersession=1.0, era_mixing=0.0, refusal=1.0, invariance=1.0
+```
+
+| Metric | Value | Floor / ceiling | Verdict |
+| --- | ---: | ---: | --- |
+| `as_of_accuracy` | 1.000 | 1.000 | pass |
+| `boundary_accuracy` | 1.000 | 1.000 | pass |
+| `supersession_accuracy` | 1.000 | 1.000 | pass |
+| `era_mixing_rate` | 0.000 | 0.000 | pass |
+| `refusal_accuracy` | 1.000 | 1.000 | pass |
+| `invariance` | 1.000 | 1.000 | pass |
+
+The golden set is **124 cases derived from 10 ladders** (plus one synthetic
+artifact-missing probe, so 125 evaluated payloads), built from a frozen artifact
+of **41 claims over 2,105 documents**. Case coverage: 113 answer-expected, 12
+refusal-expected, 72 boundary cases, 113 supersession cases, and an era-mixing
+denominator of 125.
+
+**The retrieval gate is unchanged.** `invariance` re-runs the ordinary retrieval
+gate under `--check-default-mode` and asserts its frozen numbers:
+
+| Quantity | Value |
+| --- | --- |
+| Retrieval cases completed | 16/16 |
+| Retrieval errors | 0 |
+| Hit@4 | 0.875 |
+| MRR@4 | 0.796875 |
+
+This is the same 16/16 · 0.875 · 0.796875 recorded in
+[`RETRIEVAL-GATE.md`](RETRIEVAL-GATE.md), reproduced by the temporal gate's
+default-mode re-check on every full run.
+
+Note: `invariance` requires the database (it re-runs the retrieval gate), so it
+is only measured under `--check-default-mode`. The committed
+[`eval/results/temporal_report.md`](../../eval/results/temporal_report.md) is the
+**keyless CI invocation**, which leaves `invariance` as `not measured`; the
+1.000 above is the full, database-backed measurement.
+
+## How to reproduce
+
+```bash
+# 1. The each-run gate, no database, no key, no network. CI runs exactly this.
+./.venv/Scripts/python.exe -m eval.temporal_gate
+
+# 2. The full run, including the retrieval-gate invariance re-check.
+#    Requires the database. Build DATABASE_URL from .env, swapping the host
+#    from `db:5432` to the reachable Postgres.
+./.venv/Scripts/python.exe -m eval.temporal_gate --check-default-mode
+
+# 3. Assert the committed golden set is still exactly what the generator derives.
+./.venv/Scripts/python.exe scripts/generate_temporal_golden.py --check
+
+# 4. Regenerate it (a no-op when nothing drifted).
+./.venv/Scripts/python.exe scripts/generate_temporal_golden.py
+```
+
+**What "byte-identical" means here.** The golden set is *derived, never
+hand-written*: `scripts/generate_temporal_golden.py` reads the claims artifact,
+groups its claims into ladders by source, and emits one case per interesting
+date per rung. The serialiser is canonical — sorted JSON keys, UTF-8, LF line
+endings — so the same input produces the same bytes on any platform. `--check`
+compares the committed file byte-for-byte against a fresh derivation and exits
+non-zero on any drift, and the CI job regenerates the file and `diff`s it. A
+golden set that can be regenerated byte-identically is a golden set that no one
+hand-tuned to pass.
+
+## The provenance chain
+
+Every as-of answer is traceable end to end, with no step that can invent a
+value:
+
+```text
+question "fadcs"
+  -> ladder data/myscheme/fadcs.md (matched by scheme name)
+  -> claim data/myscheme/fadcs.md#2020-01-01  (value 1350, effective 2020-01-01)
+  -> verbatim span "₹1350/- w.e.f. 01.01.2020"
+  -> source file data/myscheme/fadcs.md
+```
+
+Two tests pin the chain so a dated claim cannot be fabricated anywhere in it:
+
+1. **Span-in-source.** `tests/test_temporal.py::test_every_frozen_span_literally_appears_in_its_named_source`
+   opens every source named by the claims artifact and asserts the recorded span
+   literally appears in it. `tests/test_temporal_answer.py::test_cited_span_literally_appears_in_its_named_source`
+   asserts the span an answer cites is the same literally-present text. A claim
+   cannot survive unless the exact sentence is in the exact file.
+2. **Golden-set reproducibility.** `tests/test_temporal_gate.py::test_golden_set_is_reproducible_from_the_artifact_byte_for_byte`
+   re-derives the golden set and compares bytes. The expectations themselves are
+   computed from the artifact (`derived_from` records the claim ids), so a case
+   cannot be edited to expect a value the artifact does not state.
+
+Together these mean the measured score is a statement about the committed
+artifact and its sources, not about the gate's own Goodhart-able target: the
+function can only answer with a value some document declared, from a sentence
+some test proved is in that document.
+
+## Worked example: the FADCS ladder
+
+`data/myscheme/fadcs.md` (Haryana, Financial Assistance to Destitute Children
+Scheme) states one benefit value changing over time, each change carrying its own
+effective date. Asking as of **2021-01-01** returns:
+
+```text
+As of 2021-01-01, the value in force for Financial Assistance To Destitute
+Children Scheme is ₹1,350 per month. It took effect on 2020-01-01. It remained
+in force until 2021-04-01, when ₹1,600 per month took over.
+
+Source: data/myscheme/fadcs.md — "₹1350/- w.e.f. 01.01.2020"
+```
+
+The ₹1,350 claim is in force from its declared effective date 2020-01-01 until
+the next rung, ₹1,600 on 2021-04-01; the answer names both and cites the exact
+span. The boundary is inclusive, so `as_of=2021-04-01` returns ₹1,600, and
+`as_of=2021-03-31` returns ₹1,350.
+
+Asked about a date before the ladder begins, the answer refuses rather than
+borrowing the earliest value:
+
+```text
+No declared value is recorded for Financial Assistance To Destitute Children
+Scheme on or before 2008-01-01. The earliest declared value is ₹200 per month,
+effective from 2009-03-01. The answer for this date cannot be established, and
+no current or latest value has been substituted.
+```
+
+## Honest limits
+
+These are part of the evidence, stated in the same breath as the numbers.
+
+- **Coverage ceiling: the capability is real but narrow.** Of 2,105 documents,
+  only **79 declare any effective / amendment / notification date**; **1,982
+  declare none at all** (the remaining 44 carry a non-authoritative verification
+  date only). The as-of answer path is anchored in the small, enumerable subset
+  of documents that state their own history — most clearly the five Haryana
+  social-security rate ladders, and best of all `fadcs.md`. For the other ~94%
+  there is no declared date and no superseded value, so there is nothing to
+  answer from. `1.000` is the score on the frozen 124 cases that exist; it is not
+  a statement about the corpus at large. The full per-class counts and the
+  classification rules are in
+  [`TEMPORAL-INVENTORY.md`](../versioning/TEMPORAL-INVENTORY.md).
+- **This is not corpus versioning.** The corpus is a single snapshot. The
+  documents state their *own* history; the system reads those statements. There
+  is **no per-document revision chain, no superseded-document tracking, and no
+  point-in-time index** over the corpus. Nothing here lets you retrieve "the
+  March 2023 version of document X"; it lets you retrieve the value a document
+  says was in force in March 2023.
+- **The gate is a consistency gate, not a quality estimate.** The as-of answer
+  is a pure function of the committed artifact, and the golden set is derived
+  from that same artifact, so **1.000 is the expected score and the floor is
+  exactly 1.000**. The gate catches regressions in the code's fidelity to the
+  artifact; it cannot tell you the ladder is correct. It proves the code
+  faithfully reflects the artifact, and (through the span-in-source test) that
+  the artifact faithfully reflects the sources — no more.
+- **Ladder correctness is only as good as the declared dates.** A scheme that
+  misstates its own effective date is faithfully reproduced as misstated. The
+  system reads the dates the document declares; it does not adjudicate whether
+  the document's dates are legally correct, and it does not cross-check them
+  against any external register.
+
+## What this does NOT claim
+
+- Not a production temporal benchmark: it is one deterministic run on one
+  artifact on one host on 2026-10-06.
+- Not a generalisation estimate: the golden set is derived from the artifact the
+  function reads, so it cannot estimate accuracy on unseen temporal questions.
+- Not a claim that any additional document declares a date, or that the five
+  ladders are the only ones the corpus could ever contain.
+- Not a database schema change: the dated-claim artifact is a committed data
+  file; no new columns, migrations, or index are introduced.
+
+## Reproduce
+
+```bash
+./.venv/Scripts/python.exe -m eval.temporal_gate            # keyless, CI-equivalent
+./.venv/Scripts/python.exe -m eval.temporal_gate --check-default-mode   # + invariance (DB)
+./.venv/Scripts/python.exe scripts/generate_temporal_golden.py --check
+./.venv/Scripts/python.exe -m pytest -q
+./.venv/Scripts/python.exe tools/check_claims.py
+```
+
+CI wraps the keyless path in
+[`.github/workflows/temporal.yml`](../../.github/workflows/temporal.yml): it
+regenerates the golden set and `diff`s it, then scores the as-of path with
+`GROQ_API_KEY=""`, no database, and no network.
