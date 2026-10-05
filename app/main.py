@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app import catalog, ingest, profiles, recommend
 from app import feedback as feedback_store
 from app.config import settings
+from app.core.scheme import spine
 from app.db import (
     VECTOR_GENERATION_COLUMN,
     VECTOR_TABLE,
@@ -18,10 +19,8 @@ from app.db import (
     stored_corpus_generation,
     stored_embedding_model,
 )
-from app.guardrails.middleware import answer_with_pii_protection
 from app.ops import ops as operator
 from app.ratelimit import RateLimitMiddleware
-from app.stream import stream_answer
 from app.tracing import setup_tracing
 from app.schemas import (
     FeedbackRequest,
@@ -332,7 +331,7 @@ def query(req: QueryRequest):
     tokens or profile secrets are ever accepted, logged, or returned here.
     """
     return QueryResponse(
-        **answer_with_pii_protection(
+        **spine.egress(
             req.question,
             language=req.language,
             profile=req.profile,
@@ -373,7 +372,7 @@ async def query_stream(req: QueryRequest):
 
     async def _proxy():
         try:
-            async for part in stream_answer(
+            async for part in spine.stream(
                 req.question, req.language, req.profile
             ):
                 yield part
