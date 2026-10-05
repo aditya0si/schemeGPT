@@ -33,6 +33,7 @@ if str(ROOT) not in sys.path:
 def _redirect_evidence_writers(tmp_path, monkeypatch):
     """Point every evidence writer constant at ``tmp_path``, at call time."""
     import deploy.field.drill as drill
+    import eval.pii_benchmark as pii_benchmark
     import eval.retrieval_gate as retrieval_gate
     import eval.run_eval as run_eval
 
@@ -46,6 +47,9 @@ def _redirect_evidence_writers(tmp_path, monkeypatch):
     # patching run_eval is not enough: patch its own derived constant too.
     monkeypatch.setattr(
         retrieval_gate, "RESULTS_FILE", results / "retrieval_scores.json"
+    )
+    monkeypatch.setattr(
+        pii_benchmark, "RESULTS_FILE", results / "pii_benchmark.json"
     )
 
     reports = tmp_path / "deploy" / "field" / "reports"
