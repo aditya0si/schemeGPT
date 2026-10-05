@@ -20,3 +20,6 @@ deploy/field/state/
 deploy/field/backups/
 deploy/field/bundles/
 var/
+
+# Editor / scratch
+.zed/

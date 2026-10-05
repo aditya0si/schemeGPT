@@ -1,0 +1,39 @@
+{
+  "A_install_baseline": {
+    "image": "schemegpt:v1.0.0",
+    "health_seconds": 0.29,
+    "ops_status_code": 404,
+    "operator_endpoints": "absent (baseline build)",
+    "first_answer_mode": "live",
+    "first_answer_sources": 4,
+    "answer_seconds": 2.02
+  },
+  "B_upgrade": {
+    "exit_code": 1,
+    "seconds": 36.23,
+    "reported_version": "5a1aa41fc1fbeeba93ee0f61fe53f6033dfcefad",
+    "ai_state": "enabled",
+    "post_upgrade_mode": "live",
+    "batch_log": [
+      "[21:40:40] Upgrade schemegpt:v1.0.0 -> v2.0.0 (schemegpt:v1.0.0 -> schemegpt-api:v2.0.0)",
+      "[21:40:41] Vector rows before: 26411",
+      "[21:40:51] Rollback point: [21:40:41] Snapshotting the database to /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214041Z-schemegpt:v1.0.0-pre-v2.0.0.sql",
+      "/c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214041Z-schemegpt:v1.0.0-pre-v2.0.0.sql",
+      "[21:40:51] Environment snapshot: /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214051Z-pre-v2.0.0.env (contains secrets; rotated with the backups)",
+      "[21:40:51] Pinned SCHEMEGPT_API_IMAGE=schemegpt-api:v2.0.0 in deploy/field/state/deploy.env",
+      "[21:40:51] Recreating the API container on the new image",
+      "[21:41:03] Healthy after 5s",
+      "[21:41:12] Post-upgrade smoke: 200:live:4",
+      "[21:41:13] Vector rows after: 26411"
+    ]
+  },
+  "error": "RuntimeError: upgrade failed:\n Container schemegpt-db-1 Running \n Container schemegpt-api-1 Recreate \n Container schemegpt-api-1 Recreated \n Container schemegpt-db-1 Waiting \n Container schemegpt-db-1 Healthy \n Container schemegpt-api-1 Starting \n Container schemegpt-api-1 Started \ndeploy/field/upgrade.sh: line 117: PYTHON: unbound variable\n",
+  "meta": {
+    "tool": "schemegpt-field-drill",
+    "at": "20260919T214114Z",
+    "host": "Aditya",
+    "api": "http://127.0.0.1:8000",
+    "baseline_version": "v1.0.0",
+    "release_version": "v2.0.0"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "A_install_baseline": {
+    "image": "schemegpt:v1.0.0",
+    "health_seconds": 5.71,
+    "ops_status_code": 404,
+    "operator_endpoints": "absent (baseline build)",
+    "first_answer_mode": "live",
+    "first_answer_sources": 4,
+    "answer_seconds": 8.38
+  },
+  "B_upgrade": {
+    "exit_code": 0,
+    "seconds": 33.85,
+    "reported_version": "5a1aa41fc1fbeeba93ee0f61fe53f6033dfcefad",
+    "ai_state": "enabled",
+    "post_upgrade_mode": "live",
+    "batch_log": [
+      "[21:44:13] Post-upgrade smoke: 200:live:4",
+      "[21:44:14] Vector rows after: 26411",
+      "[21:44:15] Reporting version: 5a1aa41fc1fbeeba93ee0f61fe53f6033dfcefad (expected v2.0.0)",
+      "",
+      "Upgrade complete: schemegpt:v1.0.0 -> v2.0.0",
+      "",
+      "  health gate : 6s",
+      "  smoke       : 200:live:4",
+      "  vectors     : 26411 -> 26411",
+      "  rollback pt : [21:43:45] Snapshotting the database to /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214345Z-schemegpt:v1.0.0-pre-v2.0.0.sql",
+      "/c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214345Z-schemegpt:v1.0.0-pre-v2.0.0.sql",
+      "  record      : /c/Users/oliad/Desktop/SchemeGPT/deploy/field/logs/20260919T214415Z-upgrade.json"
+    ]
+  },
+  "C_broken_release": {
+    "exit_code": 1,
+    "seconds": 268.05,
+    "expected_exit_code": 1,
+    "rolled_back_to_version": null,
+    "healthy_after_rollback": null,
+    "mode_before": "live",
+    "log_tail": [
+      "[21:44:18] Upgrade v2.0.0 -> v2.0.1 (schemegpt-api:v2.0.0 -> schemegpt-api:v2.0.0)",
+      "[21:44:19] Vector rows before: 26411",
+      "[21:44:26] Rollback point: [21:44:19] Snapshotting the database to /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214419Z-v2.0.0-pre-v2.0.1.sql",
+      "/c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214419Z-v2.0.0-pre-v2.0.1.sql",
+      "[21:44:26] Environment snapshot: /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214426Z-pre-v2.0.1.env (contains secrets; rotated with the backups)",
+      "[21:44:26] Pinned SCHEMEGPT_API_IMAGE=schemegpt-api:v2.0.0 in deploy/field/state/deploy.env",
+      "[21:44:26] Recreating the API container on the new image",
+      "[21:46:32] Rolling back to v2.0.0",
+      "[21:46:34] Rollback: v2.0.0 -> v2.0.0 (schemegpt-api:v2.0.0)",
+      "[21:46:34] Database left as-is (no --restore-db given).",
+      "[21:46:34] Restored the environment file from /c/Users/oliad/Desktop/SchemeGPT/deploy/field/backups/20260919T214426Z-pre-v2.0.1.env",
+      "[21:46:34] Pinned SCHEMEGPT_API_IMAGE=schemegpt-api:v2.0.0 in deploy/field/state/deploy.env"
+    ],
+    "detect_to_recover_seconds": null,
+    "records": [
+      "20260919T214843Z-rollback_failed.json"
+    ]
+  },
+  "error": "RuntimeError: kill switch call failed: 0 {'error': 'RemoteDisconnected: Remote end closed connection without response'}",
+  "meta": {
+    "tool": "schemegpt-field-drill",
+    "at": "20260919T214844Z",
+    "host": "Aditya",
+    "api": "http://127.0.0.1:8000",
+    "baseline_version": "v1.0.0",
+    "release_version": "v2.0.0"
+  }
+}
