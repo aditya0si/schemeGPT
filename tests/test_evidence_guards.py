@@ -82,10 +82,12 @@ def test_published_retrieval_figures_appear_in_readme():
     hit_floor = table["Hit@4 floor"]
     mrr_floor = table["MRR@4 floor"]
 
-    # The frozen record must encode the verified measurement. 2026-10-06: the
-    # lexical tie-break was made deterministic, which removed the plan-dependent
-    # 0.875 and produced a reproducible 0.8125 below the Hit@4 floor.
-    assert (hit, mrr, cases) == ("0.8125", "0.75", "16/16")
+    # The frozen record must encode the verified measurement. 2026-10-06: making
+    # the lexical tie-break deterministic produced a reproducible 0.8125 below
+    # the Hit@4 floor; completing the diversity rule (one chunk per logical
+    # document, highest-trust copy wins) recovered the verified PM-KISAN copy and
+    # raised the reproducible figure to 0.875 / 0.796875, with the floor unchanged.
+    assert (hit, mrr, cases) == ("0.875", "0.796875", "16/16")
     assert (hit_floor, mrr_floor) == ("0.85", "0.60")
 
     # ...and README must quote those exact characters.

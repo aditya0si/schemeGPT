@@ -167,22 +167,26 @@ fused with RRF and kept source-diverse in the top-4) and fails on incomplete
 coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. The gate was
 found to be **plan-dependent**: the lexical channel broke ties on unspecified
 Postgres row order, so the same corpus, model and configuration returned both
-0.875 and 0.8125. That is fixed by data-only tie-breaking. The now-reproducible
-measurement on the full ingested corpus generation `7213926b8590933d...`
-(2,105 markdown files, ~20k chunks) is **Hit@4 0.8125** and **MRR@4 0.75**
-across 16/16 completed cases with 0 retrieval errors, identical on 5 separate
-runs. That is **below the 0.85 floor, so the gate currently FAILS**; the floor
-was deliberately not lowered, and raising retrieval quality is a separate task.
-The deterministic misses are the PM-SYM Hinglish and unorganised-worker profile
-questions (no lexical anchor) plus the PM-KISAN colloquial question, where the
-auto-imported `myscheme/pm-kisan.md` now outranks the hand-verified
-`schemes/pm-kisan.md`. The frozen measurement — the exact command, the corpus
-generation and chunk count, the embedding model, the date, and an explicit
-statement of what is *not* claimed — is recorded in
+0.875 and 0.8125. That was fixed by data-only tie-breaking, which exposed a
+second defect: `_select_diverse` capped one chunk per *source string*, so a
+scheme indexed twice (hand-verified `schemes/pm-kisan.md` and auto-imported
+`myscheme/pm-kisan.md`) could spend two provenance slots and squeeze out the
+verified copy. The diversity rule now caps one chunk per **logical document**
+(basename, `(N)` duplicate suffix stripped) and promotes the highest-trust copy
+by `data_status`, so the verified document is cited in preference to the
+automated import. The now-reproducible measurement on the full ingested corpus
+generation `7213926b8590933d...` (2,105 markdown files, ~20k chunks) is **Hit@4
+0.875** and **MRR@4 0.796875** across 16/16 completed cases with 0 retrieval
+errors, identical on 5 separate runs — **above the 0.85 floor, so the gate
+PASSES**. The two remaining deterministic misses are the PM-SYM Hinglish and
+unorganised-worker profile questions, neither of which has a lexical anchor. The
+frozen measurement — the exact command, the corpus generation and chunk count,
+the embedding model, the date, and an explicit statement of what is *not*
+claimed — is recorded in
 [`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
 quality remains a tracked metric, not a solved problem.
 
-<!-- claims: tests=509 evidence=20 -->
+<!-- claims: tests=517 evidence=20 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
