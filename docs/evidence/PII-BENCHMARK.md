@@ -161,9 +161,54 @@ Additional explicit limits:
 - PAN, GSTIN, IFSC, and UPI match case-insensitively (see "Case handling"); the
   numeric kinds have no case. Nothing is left case-sensitive on purpose, so there
   is no deliberate case gap to state.
-- This phase (6a) is detection only. Nothing here is a request-path result; the
-  reversible vault, the FastAPI integration, and streaming overlap buffering are
-  Phase 6b/6c.
+- This benchmark measures detection only. The request-path integration and its
+  own tests are the separate Phase 6b section below; streaming overlap buffering
+  is Phase 6c.
+
+## Request-path integration (Phase 6b)
+
+Phase 6b wires the detection core into the **non-streaming** `POST /query` path.
+Streaming is Phase 6c and is untouched.
+
+- **What is redacted.** The inbound question, before retrieval or generation.
+  Each detected span is replaced with a request-scoped placeholder
+  (`[[PII:<nonce>:<KIND>:<n>]]`) from `app.guardrails.vault.Vault`. The raw
+  identifier is exactly what would otherwise have left the process in the prompt
+  to the hosted provider; the placeholder is not reversible without that
+  request's in-memory mapping.
+- **When.** On every synchronous question, if `ENABLE_PII_VAULT` is on and at
+  least one identifier is detected. The outbound answer is restored
+  (placeholders back to originals) before it is returned. A question with no
+  detected PII is passed through byte-identically, semantic cache included.
+- **Cache.** A request that contained PII **bypasses the semantic cache
+  entirely** — both the lookup and the store. This is deliberate: an answer
+  containing a restored identifier must never be written where a different
+  request could later be served it. Clean questions still use the cache
+  normally.
+- **Config default.** `ENABLE_PII_VAULT=true` (see `app/config.py`): redaction is
+  **on by default**. `ENABLE_PII_VAULT=false` is a documented escape hatch that
+  restores the pre-6b behaviour.
+- **Mapping handling.** The mapping lives only on the stack of one call: it is
+  never logged, persisted, cached, or placed in a response field, and
+  `Vault.__repr__` is opaque so an accidental log of the object cannot spill the
+  originals.
+
+### How the egress guarantee is proven
+
+The egress guarantee is proven **against a stubbed provider client in tests, not
+by inspecting real network traffic**. `tests/test_guardrails_middleware.py`
+drives a synthetic, checksum-valid Aadhaar through the real `app.rag.answer`
+pipeline with a fake provider client that records every prompt it is handed.
+The test then asserts the captured payload contains no Aadhaar-shaped string
+(`find_all(payload) == []`) and no raw value, while the citizen-facing answer has
+the original restored. The same suite proves cross-request isolation (two
+requests with the same identifier do not share a mapping), that a PII request
+bypasses the cache, and that a second request cannot be served the first
+request's identifier. The guarantee is therefore bounded by what the code sends
+to the provider client; no real socket is observed.
+
+Known limitation: only the question is scanned. Free-text profile fields
+(`occupation`, `goals`) are not redacted in 6b.
 
 ## How to reproduce
 

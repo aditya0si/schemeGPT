@@ -131,8 +131,13 @@ Said without qualification, because a security reviewer will find each of these 
 - No automated retention or erasure job for profiles or feedback; no data-subject export endpoint
   for profiles beyond reading a profile back with its token.
 - No consent capture or consent records in this codebase.
-- No PII detection or redaction on the inbound path. The only bounds are length caps (question 2 to
-  2000 characters, profile payload 12,000 characters).
+- PII redaction covers the synchronous `/query` question only. Detected
+  identifiers are replaced with request-scoped placeholders before the provider
+  call and restored in the answer, and PII-bearing requests bypass the semantic
+  cache. The streaming path, free-text profile fields, and every other field are
+  NOT yet covered, and no real-network egress audit has been performed. The only
+  other bounds remain length caps (question 2 to 2000 characters, profile
+  payload 12,000 characters).
 - No encryption applied by the application at rest; the API to database connection inside the
   Compose network is plaintext. Host-level disk encryption is the customer's control.
 - No TLS termination in the app: it expects to sit behind the customer's reverse proxy, which the

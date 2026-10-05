@@ -179,7 +179,7 @@ quality remains a tracked metric, not a solved problem: the two remaining
 misses are the PM-SYM Hinglish question and the unorganised-worker profile
 question, which have no lexical anchor.
 
-<!-- claims: tests=316 evidence=19 -->
+<!-- claims: tests=338 evidence=19 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
@@ -194,12 +194,17 @@ verifying that quoted text is an exact substring of the retrieved sources with
 no key, database, or network — is recorded in
 [`docs/evidence/OFFLINE-GENERATION.md`](docs/evidence/OFFLINE-GENERATION.md).
 
-**PII detection (Phase 6a):** dependency-free, offline recognizers for Aadhaar
-(Verhoeff-checked), PAN, GSTIN, IFSC, UPI ids, Indian mobiles, and
-Devanagari-digit forms are regression-measured at recall/precision 1.000 on a
-synthetic corpus with deliberate negatives — a self-consistency check, not a
-field result — and the frozen measurement, exact command, floors, and an
-explicit statement of what this does *not* measure are recorded in
+**PII detection and redaction (Phase 6a/6b):** dependency-free, offline
+recognizers for Aadhaar (Verhoeff-checked), PAN, GSTIN, IFSC, UPI ids, Indian
+mobiles, and Devanagari-digit forms are regression-measured at recall/precision
+1.000 on a synthetic corpus with deliberate negatives — a self-consistency
+check, not a field result. On the synchronous `/query` path the recognizers now
+feed a request-scoped reversible vault: identifiers in the question are replaced
+with placeholders before the provider call and restored in the answer, and
+PII-bearing requests bypass the semantic cache. The frozen measurement, exact
+command, floors, integration facts, and an explicit statement of what this does
+*not* measure (streaming and free-text profile fields are not yet covered) are
+recorded in
 [`docs/evidence/PII-BENCHMARK.md`](docs/evidence/PII-BENCHMARK.md).
 
 **Cost engineering:** every LLM call is also a money event. Per-model token
