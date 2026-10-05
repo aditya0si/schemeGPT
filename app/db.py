@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import sys
 from functools import lru_cache
 from typing import Any
 
@@ -11,6 +13,37 @@ from app.config import settings
 from app.embeddings import E5PrefixEmbeddings, needs_e5_prefixes
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_windows_selector_event_loop_policy() -> None:
+    """Run psycopg3's async I/O on a selector loop on Windows.
+
+    ``langchain_postgres.PGEngine`` (via ``get_pg_engine``) drives SQLAlchemy's
+    async engine with the psycopg3 async driver. psycopg3 refuses Windows'
+    default ``ProactorEventLoop`` and raises::
+
+        Psycopg cannot use the 'ProactorEventLoop' to run in async mode.
+
+    That breaks ingestion in :func:`ensure_vector_table` and retrieval in
+    :func:`get_vectorstore` (``similarity_search_with_score``). Linux and the
+    containers already default to a selector loop, so this guard is Windows-only
+    and leaves other platforms byte-for-byte unchanged. It runs at import time,
+    before any async ``PGEngine`` connection can be created; that also covers a
+    server started with ``uvicorn app.main:app``, whose loop is built from the
+    policy after this module is imported. Idempotent: a policy that is already
+    the selector policy is left untouched.
+
+    Verified with:
+        ./.venv/Scripts/python.exe -m pytest tests/test_db.py -q
+    """
+    if sys.platform != "win32":
+        return
+    policy = asyncio.get_event_loop_policy()
+    if not isinstance(policy, asyncio.WindowsSelectorEventLoopPolicy):
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+_ensure_windows_selector_event_loop_policy()
 
 # The maintained adapter uses an application-owned table instead of the legacy
 # langchain_pg_collection/langchain_pg_embedding schema. Existing deployments
