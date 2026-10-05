@@ -9,8 +9,8 @@ returned a pre-made demo fallback instead. The archive does not record **why**
 those 7 fell back, so no cause is asserted here — in particular a rejected
 credential must not be inferred. Case 0 is a genuine live answer whose judge
 calls were throttled with `RateLimitError` (HTTP 429) *"on tokens per day
-(TPD): Limit 200000, Used 199911"*, naming organization
-`org_01ks7njm54ehm9mbfdc97rda95`; that proves the credential **authenticated**
+(TPD): Limit 200000, Used 199911"*, naming the account's organization
+`org_<redacted>`; that proves the credential **authenticated**
 on 2026-09-01 and was merely rate-limited. Those 7 cases sit in every
 denominator, so the aggregate rates (`quote verification 0.50`,
 `citation coverage 0.25`) measure the archive's failure mode, not the
@@ -73,7 +73,7 @@ ever ground.
 
 | Date | Observation | Where |
 | --- | --- | --- |
-| 2026-09-01 | case 0 carries an authenticated-org throttle: `RateLimitError` HTTP 429 on tokens per day, org `org_01ks7njm54ehm9mbfdc97rda95`, `Used 199911` of `Limit 200000` | `eval/results/scores.json` (case 0 `error`) |
+| 2026-09-01 | case 0 carries an authenticated-org throttle: `RateLimitError` HTTP 429 on tokens per day, org `org_<redacted>`, `Used 199911` of `Limit 200000` | `eval/results/scores.json` (case 0 `error`) |
 | 2026-10-05 | a read-only models probe with the ambient credential returned `HTTP 401` code `invalid_api_key` | this repository's offline work log |
 
 The credential **authenticated** on 2026-09-01 — it was throttled on the free
