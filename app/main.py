@@ -18,8 +18,8 @@ from app.db import (
     stored_corpus_generation,
     stored_embedding_model,
 )
+from app.guardrails.middleware import answer_with_pii_protection
 from app.ops import ops as operator
-from app.rag import answer
 from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
 from app.tracing import setup_tracing
@@ -332,7 +332,7 @@ def query(req: QueryRequest):
     tokens or profile secrets are ever accepted, logged, or returned here.
     """
     return QueryResponse(
-        **answer(
+        **answer_with_pii_protection(
             req.question,
             language=req.language,
             profile=req.profile,

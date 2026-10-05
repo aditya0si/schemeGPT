@@ -799,6 +799,8 @@ def answer(
     question: str,
     language: str = "en",
     profile: ProfileData | None = None,
+    *,
+    skip_cache: bool = False,
 ) -> dict:
     """Answer a question, optionally in Hindi and with a saved profile attached.
 
@@ -818,6 +820,12 @@ def answer(
       is configured at all, or when retrieval-only assembly also failed
       (database unreachable). /query still returns HTTP 200 and never leaks a
       traceback or provider details to the browser.
+
+    ``skip_cache=True`` disables both the semantic-cache lookup and the store
+    for this call while leaving every other tier, the kill switch, and the
+    provider breaker untouched. The PII integration uses it: a request that
+    carried an identifier is processed with redacted text and its (restored)
+    answer must never be cached or replayed to another request.
     """
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
@@ -865,7 +873,11 @@ def answer(
         )
         return demo_answer(question, lang)
     with stage_span("cache_lookup") as span:
-        if generation:
+        if skip_cache:
+            # PII path: never serve or store a cached answer. A restored
+            # identifier must not be replayed to a different request.
+            cached = None
+        elif generation:
             cached = semantic_cache.lookup(question, lang, ph, generation)
         else:
             cached = semantic_cache.lookup(question, lang, ph)
@@ -942,5 +954,6 @@ def answer(
         "mode": "live",
         "language": lang,
     }
-    semantic_cache.store(question, lang, ph, payload, generation)
+    if not skip_cache:
+        semantic_cache.store(question, lang, ph, payload, generation)
     return payload

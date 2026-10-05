@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # paraphrased repeats of a question (cosine >= 0.95, same language and
     # profile). Disable with ENABLE_SEMANTIC_CACHE=false.
     enable_semantic_cache: bool = True
+    # Reversible PII redaction on the synchronous /query path. When enabled
+    # (the default), Indian identifiers detected in the question are replaced
+    # with request-scoped placeholders before retrieval and generation, and
+    # restored in the answer. Requests that carried PII bypass the semantic
+    # cache so a restored identifier is never replayed to another request.
+    # Disable with ENABLE_PII_VAULT=false only for a deliberate reason.
+    enable_pii_vault: bool = True
     # Per-IP token-bucket rate limit for /query and /query/stream (requests
     # per minute; 0 disables). Protects the shared Groq free-tier quota.
     rate_limit_rpm: int = 20
