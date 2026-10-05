@@ -14,6 +14,7 @@ leaks a traceback or provider details to the browser.
 import json
 import logging
 import re
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from app.db import get_retriever as get_hybrid_retriever
 from app.ops import ops as operator
 from app.quotes import validate_quotes
 from app.schemas import ProfileData
+from app.temporal_answer import temporal_answer
 from app.tracing import stage_span
 
 logger = logging.getLogger(__name__)
@@ -801,8 +803,15 @@ def answer(
     profile: ProfileData | None = None,
     *,
     skip_cache: bool = False,
+    as_of: date | None = None,
 ) -> dict:
     """Answer a question, optionally in Hindi and with a saved profile attached.
+
+    When ``as_of`` is set, the answer is resolved deterministically from the
+    committed dated-claims artifact (value in force on that date, its effective
+    range, its replacement and the verbatim source span) and no provider,
+    cache or retrieval is touched. This branch is strictly additive: with
+    ``as_of`` absent the function below is byte-for-byte the previous path.
 
     Live path: retrieve from pgvector and call ChatGroq via the LangChain
     chain. The language selects the cached per-language chain; the compact
@@ -828,6 +837,8 @@ def answer(
     answer must never be cached or replayed to another request.
     """
     lang = _normalize_language(language)
+    if as_of is not None:
+        return temporal_answer(question, as_of, lang)
     profile_context = _build_profile_context(profile, lang)
     if not settings.groq_api_key.strip():
         return demo_answer(question, lang)

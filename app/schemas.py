@@ -1,6 +1,19 @@
+import re
+from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
+
+# Strict ISO calendar-date form for the optional ``as_of`` query parameter.
+# Enforced before Pydantic's own date parsing so a loosely-spelled date
+# (``2021-1-1``) is a 422 rather than being silently normalised.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # --- Iteration 1: nationwide catalog, saved profiles, recommendations ---------
 
@@ -63,6 +76,27 @@ class QueryRequest(BaseModel):
     # still validates unchanged.
     language: Literal["en", "hi"] = "en"
     profile: ProfileData | None = None
+
+    # Iteration 5 (as-of semantics): optional ISO date (``YYYY-MM-DD``). When
+    # present, the answer states the value in force on that date from the
+    # committed dated-claims artifact. Absent (the default) means behaviour is
+    # completely unchanged. A malformed date is a normal 422 validation error.
+    as_of: date | None = Field(
+        default=None,
+        description="ISO date (YYYY-MM-DD); answers 'what did the scheme say "
+        "on this date'.",
+    )
+
+    @field_validator("as_of", mode="before")
+    @classmethod
+    def _require_iso_date(cls, value: object) -> object:
+        if value is None or isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if _ISO_DATE_RE.match(stripped):
+                return stripped
+        raise ValueError("as_of must be an ISO date in YYYY-MM-DD form")
 
 
 class Source(BaseModel):

@@ -335,6 +335,7 @@ def query(req: QueryRequest):
             req.question,
             language=req.language,
             profile=req.profile,
+            as_of=req.as_of,
         )
     )
 
@@ -373,7 +374,7 @@ async def query_stream(req: QueryRequest):
     async def _proxy():
         try:
             async for part in spine.stream(
-                req.question, req.language, req.profile
+                req.question, req.language, req.profile, as_of=req.as_of
             ):
                 yield part
         finally:

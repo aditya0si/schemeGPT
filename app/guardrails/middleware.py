@@ -70,6 +70,7 @@ def answer_with_pii_protection(
     question: str,
     language: str = "en",
     profile: ProfileData | None = None,
+    as_of=None,
 ) -> dict:
     """Answer ``question`` with detected identifiers redacted on egress.
 
@@ -77,7 +78,13 @@ def answer_with_pii_protection(
     :func:`app.rag.answer` (documented escape hatch). With it true and no PII
     detected, the call is also unchanged, so clean questions keep using the
     semantic cache.
+
+    An ``as_of`` request is resolved deterministically from the committed
+    claims artifact and never reaches a provider, so it needs no redaction; it
+    is answered directly.
     """
+    if as_of is not None:
+        return rag.answer(question, language, profile, as_of=as_of)
     if not getattr(settings, "enable_pii_vault", True):
         return rag.answer(question, language, profile)
 

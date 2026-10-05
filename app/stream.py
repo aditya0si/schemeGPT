@@ -43,6 +43,7 @@ from app.rag import (
 from app.config import settings
 from app.quotes import validate_quotes
 from app.schemas import ProfileData
+from app.temporal_answer import temporal_answer
 from app.tracing import stage_span
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,12 @@ async def _stream_fallback(payload: dict, lang: str) -> AsyncIterator[str]:
     if quoted:
         yield _sse("quotes", [q.__dict__ for q in quoted])
     mode = payload.get("mode", "demo")
-    metrics.inc("queries_degraded" if mode == "degraded" else "queries_demo")
+    if mode == "degraded":
+        metrics.inc("queries_degraded")
+    elif mode == "as_of":
+        metrics.inc("queries_as_of")
+    else:
+        metrics.inc("queries_demo")
     yield _sse(
         "done",
         {
@@ -107,8 +113,16 @@ async def _stream_answer_core(
     profile: ProfileData | None = None,
     *,
     skip_cache: bool = False,
+    as_of=None,
 ) -> AsyncIterator[str]:
     lang = _normalize_language(language)
+    if as_of is not None:
+        # Deterministic, offline, provider-free: stream the as-of payload with
+        # the same event shape (sources -> token* -> done) as every other tier.
+        payload = temporal_answer(question, as_of, lang)
+        async for event in _stream_fallback(payload, lang):
+            yield event
+        return
     profile_context = _build_profile_context(profile, lang)
 
     # Keep demo-mode requests database-free and match synchronous behavior.
@@ -295,6 +309,7 @@ async def stream_answer(
     question: str,
     language: str = "en",
     profile: ProfileData | None = None,
+    as_of=None,
 ) -> AsyncIterator[str]:
     """Stream an answer with request-scoped PII redaction (Phase 6c).
 
@@ -309,7 +324,16 @@ async def stream_answer(
     flushed once, immediately before the first ``quotes``/``done`` event, so
     token events still precede both terminal events. On a mid-stream ``error``
     or a client disconnect the tail is discarded, never emitted.
+
+    An ``as_of`` request is deterministic and provider-free, so it bypasses the
+    redactor entirely and streams the as-of payload directly.
     """
+    if as_of is not None:
+        async for part in _stream_answer_core(
+            question, language, profile, as_of=as_of
+        ):
+            yield part
+        return
     if not getattr(settings, "enable_pii_vault", True):
         async for part in _stream_answer_core(question, language, profile):
             yield part
