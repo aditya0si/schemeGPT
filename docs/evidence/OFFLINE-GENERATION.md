@@ -1,11 +1,73 @@
 # Offline generation snapshot — measured results
 
+## This is not a generation-quality baseline
+
+This document does **not** establish a generation-quality baseline, and none of
+the rates below is a quality signal. The only capture available is degenerate:
+**1 of its 8 cases is grounded**, and the other 7 never retrieved a source
+because the provider credential was rejected and the pipeline returned a
+pre-made demo fallback. Those 7 cases sit in every denominator, so the
+aggregate rates (`quote verification 0.50`, `citation coverage 0.25`) measure
+the archive's failure mode, not the generator. The numbers are published
+because the mechanism is real and CI-gated; the quality claim is not.
+
+What the measurement *does* establish is the mechanism: a keyless,
+network-free, CI-gated check that a quoted line in an archived answer is an
+exact substring of that case's retrieved sources. That mechanism is useful even
+though its first input is degenerate, and it is the reason this document
+exists.
+
+<!-- offline-provenance: cases=8 grounded_cases=1 quote_lines=2 verified_quotes=1 -->
+
 Frozen evidence for the offline generation regression baseline. It scores the
-archived live-run capture in
+archived capture in
 [`eval/fixtures/generation_snapshot.jsonl`](../../eval/fixtures/generation_snapshot.jsonl)
 with only pure `app.quotes` functions: no API key, no database, no network. The
 machine-readable output (`eval/results/generation_offline_scores.json`) is
-git-ignored, so this document is the committed record.
+git-ignored, so this document is the committed record. The comment block above
+is read by `tests/test_offline_generation.py`, which asserts the stated
+provenance counts agree with the fixture and with the module constants
+`ARCHIVE_GROUNDED_CASES` / `ARCHIVE_QUOTE_LINES`; the document cannot silently
+disagree with the artifact.
+
+## What the archived capture actually contains
+
+The archive is a single run dated `2026-09-01T21:50:00+00:00`. Case by case:
+
+| Case | Id | Sources | Contexts | Quote lines | Status |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `pmjay-cover` | 4 | 4 | 1 | the only grounded live answer |
+| 1 | `gst-launch` | 0 | 0 | 0 | demo fallback |
+| 2 | `gst-threshold` | 0 | 0 | 0 | demo fallback |
+| 3 | `pm-kisan-payment` | 0 | 0 | 1 | demo fallback (1 stray `>` line) |
+| 4 | `pm-kisan-exclusions` | 0 | 0 | 0 | demo fallback |
+| 5 | `pm-sym-pension` | 0 | 0 | 0 | demo fallback |
+| 6 | `pmay-g-assistance` | 0 | 0 | 0 | demo fallback |
+| 7 | `startup-india-eligibility` | 0 | 0 | 0 | demo fallback |
+
+Cases 1–7 all carry the same archive error:
+
+```text
+Live RAG returned demo fallback; provide a valid GROQ_API_KEY before evaluating
+```
+
+Case 3's lone `>` line is not a generated citation; it is a stray line left
+inside a demo-fallback answer, and it is the second of the two quote lines that
+the metric folds in. Case 0 is the only case whose answer is absent from the
+demo corpus and carries retrieved sources, so it is the only answer that could
+ever ground.
+
+### Credential-failure timeline
+
+| Date | Observation | Where |
+| --- | --- | --- |
+| 2026-09-01 | 7 of 8 archived cases carry the demo-fallback error naming the credential | `eval/results/scores.json` (`generated_at`) |
+| 2026-10-05 | an independent probe of the credential returned `401 Invalid API Key` | this repository's offline work log |
+
+The archive names the same credential cause on 2026-09-01 that a direct probe
+confirms on 2026-10-05, five weeks apart. Across that window no capture
+demonstrates live generation beyond the single case-0 answer. Any capture taken
+while the credential is rejected is degenerate by definition.
 
 ## Measured result (2026-10-05, this host, over the committed fixture)
 
@@ -22,18 +84,22 @@ Offline generation: 8 case(s), quotes=1/2 (verification_rate=0.5), cases_with_ci
 Floors passed. Results: eval/results/generation_offline_scores.json
 ```
 
-| Quantity | Value |
-| --- | --- |
-| Cases | 8 |
-| Cases with a structured quote | 2 |
-| Quotes verified (exact substring) | 1/2 |
-| Quote verification rate | 0.50 |
-| Cases with a citation | 2 |
-| Citation coverage | 0.25 |
-| Attributed citations | 0/2 |
-| Citation attribution rate | 0.00 |
-| Quote verification floor | 0.40 |
-| Citation coverage floor | 0.20 |
+Every row below states its denominator. The denominator includes the 7 demo
+fallbacks, which have no sources and therefore cannot ground a quote; rows that
+are not a quality signal say so directly.
+
+| Quantity | Value | Denominator | Basis / caveat |
+| --- | --- | --- | --- |
+| Cases | 8 | — | 1 grounded + 7 demo fallbacks |
+| Cases with a structured quote | 2 | of 8 cases | 1 real (case 0) + 1 stray `>` line in a demo fallback (case 3); **not a quality signal** |
+| Quotes verified (exact substring) | 1/2 | of 2 quote lines | the denominator counts the stray demo-fallback line; **not a quality signal** |
+| Quote verification rate | 0.50 | 2 quote lines (1 real, 1 demo-fallback stray) | **not a quality signal** |
+| Cases with a citation | 2 | of 8 cases | denominator includes 7 demo fallbacks; **not a quality signal** |
+| Citation coverage | 0.25 | 8 cases, 7 of them demo fallbacks that cannot cite | **not a quality signal** |
+| Attributed citations | 0/2 | of 2 quote lines | 0 because the archive predates the current citation-label contract |
+| Citation attribution rate | 0.00 | 2 quote lines | reported, not gated |
+| Quote verification floor (PROVISIONAL) | 0.40 | — | derived from the degenerate 0.50 measurement |
+| Citation coverage floor (PROVISIONAL) | 0.20 | — | derived from the degenerate 0.25 measurement |
 
 ## Fixture provenance
 
@@ -47,11 +113,15 @@ Floors passed. Results: eval/results/generation_offline_scores.json
 | Ids | joined to `eval/questions.json` by exact question text; all 8 matched, so none were derived |
 | Sources | the archive's retrieved source metadata, each carrying its chunk `content` |
 
-This is a real live-run capture: on 2026-09-01 the production pipeline
-retrieved and generated over the archived cases. The archive's RAGAS score
-fields (`faithfulness`, `answer_relevancy`, `context_precision`,
-`context_recall`) are all `None` — the judge experiment was retired — and they
-are ignored by this evaluation. They are not part of the fixture.
+The archive is a single real run, but it is a degenerate capture: only case 0
+was answered live; the other 7 are demo fallbacks recorded by the same run
+because the credential was rejected. It is not "the production pipeline
+retrieved and generated over all the archived cases".
+
+The archive's RAGAS score fields (`faithfulness`, `answer_relevancy`,
+`context_precision`, `context_recall`) are all `None` — the judge experiment
+was retired — and they are ignored by this evaluation. They are not part of the
+fixture.
 
 Two limits are stated plainly rather than padded:
 
@@ -83,9 +153,18 @@ case. The offline module proves this without the database by using the source
 - It is a **regression baseline over an archived capture**, not a new live
   measurement, and it is not an ongoing production benchmark.
 
-## Floors
+## Floors — PROVISIONAL
 
-Each floor sits strictly below the first measurement, with the measured value,
+Both floors are **PROVISIONAL**. They were derived from a degenerate first
+measurement (7 of 8 cases had no sources and could not ground a quote) and must
+be re-derived after the first **valid** capture. A capture is valid when:
+
+- every case carries at least one retrieved source, and
+- no case carries the demo-fallback error (the run used a working credential),
+  and
+- the archive's `generated_at` is later than 2026-10-05.
+
+Each floor sits strictly below that first measurement, with the measured value,
 the margin, and the reason recorded in the
 [`eval/offline_generation.py`](../../eval/offline_generation.py) module
 docstring:
@@ -98,6 +177,34 @@ docstring:
 A floor breach makes `python -m eval.offline_generation` exit non-zero, which
 is how `.github/workflows/offline-generation.yml` fails a pull request that
 regresses the archived baseline.
+
+## Re-capture protocol
+
+1. Supply a valid `GROQ_API_KEY` to the live harness (never commit it).
+2. Produce an archive over all 16 questions with no demo fallbacks and no
+   pipeline errors:
+   ```bash
+   python -m eval.run_eval --limit 16
+   ```
+3. Rebuild the fixture from that archive:
+   ```bash
+   python scripts/capture_generation_snapshot.py \
+     --from-archive eval/results/scores.json \
+     --output eval/fixtures/generation_snapshot.jsonl
+   ```
+4. Re-run the offline metric and read the new numbers:
+   ```bash
+   GROQ_API_KEY="" python -m eval.offline_generation
+   ```
+5. **Update the floors and this document together, in the same commit.** A
+   floor or a stated provenance count that changes without the other is a
+   drift: `tests/test_offline_generation.py` pins the stated provenance counts
+   to the fixture, and `tools/evidence_manifest.py` pins the document's bytes
+   to the manifest.
+6. Rebaseline the manifest in that same commit:
+   ```bash
+   python tools/evidence_manifest.py --write
+   ```
 
 ## How to reproduce
 

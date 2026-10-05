@@ -23,17 +23,22 @@ Two measurements are reported per case and in aggregate:
     that figure is not gated because the archived capture predates the current
     citation-label contract.
 
-The archived fixture is a real live-run capture dated 2026-09-01. Of its 8
-cases, 1 carries retrieved sources and 2 carry a structured quote, so the
-absolute rates are small; the floors guard against further regression, not
-against a high baseline.
+The archived fixture is a live-run capture dated 2026-09-01, but that first
+capture is degenerate: the credential was rejected ("Live RAG returned demo
+fallback; provide a valid GROQ_API_KEY") and 7 of its 8 cases are demo
+fallbacks with no retrieved sources. Only case 0 (``pmjay-cover``) is a real
+live answer. The aggregate rates therefore sit over a denominator that mostly
+cannot ground a quote; they are regression tripwires, **not** generation-quality
+signals, and this document must not be read as a quality baseline.
 
-Floors (set below the first measurement, never at or above it):
+Floors -- **PROVISIONAL**, derived from the degenerate first measurement and to
+be re-derived after the first valid capture (set below the first measurement,
+never at or above it):
 
-* ``QUOTE_VERIFICATION_FLOOR = 0.40`` -- measured 0.50 (1 verified quote of 2).
-  Margin 0.10. A rating clearly below the archived capture's grounding.
-* ``CITATION_COVERAGE_FLOOR = 0.20`` -- measured 0.25 (2 of 8 cases cited).
-  Margin 0.05. Guards against citations disappearing from the pipeline.
+* ``QUOTE_VERIFICATION_FLOOR = 0.40`` -- measured 0.50 (1 verified quote of 2;
+  the other quote line is a stray ``>`` inside a demo fallback). Margin 0.10.
+* ``CITATION_COVERAGE_FLOOR = 0.20`` -- measured 0.25 (2 of 8 cases cited; the
+  other 7 are demo fallbacks). Margin 0.05.
 """
 
 from __future__ import annotations
@@ -51,6 +56,13 @@ RESULTS_FILE = EVAL_DIR / "results" / "generation_offline_scores.json"
 
 QUOTE_VERIFICATION_FLOOR = 0.40
 CITATION_COVERAGE_FLOOR = 0.20
+
+# Provenance counts for the degenerate archived capture. They are quoted
+# verbatim in ``docs/evidence/OFFLINE-GENERATION.md`` and asserted against the
+# committed fixture in ``tests/test_offline_generation.py``, so the document
+# cannot silently disagree with the artifact it describes.
+ARCHIVE_GROUNDED_CASES = 1
+ARCHIVE_QUOTE_LINES = 2
 
 REQUIRED_RECORD_KEYS = ("id", "question", "answer", "sources")
 
