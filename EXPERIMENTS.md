@@ -56,14 +56,22 @@ current generation experiments use the explicit JSON judge in `eval/run_eval.py`
   full-text via RRF; deepened both vector/FTS pools to 12/12 and kept the final
   top-4 source-diverse (one chunk per source).
 - **Result:** required deterministic gate `.github/workflows/eval.yml`, run
-  `34847304948` (pull request) and main follow-up `34850488645` (both green):
-  16/16 labelled cases completed, 0 retrieval errors, **Hit@4 0.875** and
-  **MRR@4 0.765625** (floors Hit@4 >= 0.85 and MRR@4 >= 0.60, unchanged).
+  `34847304948` (pull request) and main follow-up `34850488645` (both green at
+  the time) reported 16/16 labelled cases completed, 0 retrieval errors,
+  **Hit@4 0.875** and **MRR@4 0.765625** (floors Hit@4 >= 0.85 and MRR@4 >=
+  0.60). **Corrected 2026-10-06:** those runs were plan-dependent — the lexical
+  channel broke ties on unspecified Postgres row order — so the figure was not
+  reproducible (the same input also returned Hit@4 0.8125 / MRR@4 0.75). After
+  making the ordering data-driven the stable figure is **Hit@4 0.8125** and
+  **MRR@4 0.75**, which is **below the 0.85 floor, so the gate now fails**. The
+  floor was not lowered; raising retrieval quality is a separate task.
 - **Honest caveats:** this is the measured result of those CI runs on that
-  corpus generation, not an ongoing production benchmark. The two remaining
-  misses are the PM-SYM Hinglish question and the unorganised-worker profile
-  question, which have no lexical anchor; retrieval quality remains a tracked
-  metric, not a solved problem.
+  corpus generation, not an ongoing production benchmark. The deterministic
+  misses are the PM-SYM Hinglish question, the unorganised-worker profile
+  question (neither has a lexical anchor), and the PM-KISAN colloquial question,
+  where the auto-imported `myscheme/pm-kisan.md` now outranks the hand-verified
+  `schemes/pm-kisan.md`; retrieval quality remains a tracked metric, not a
+  solved problem.
 - **Reproduce:** `python -m eval.retrieval_gate` after ingesting the corpus.
 
 ## Framework

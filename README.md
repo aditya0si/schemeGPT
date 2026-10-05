@@ -164,22 +164,25 @@ deterministic gate against 16 source-labelled English, Hindi, Hinglish, profile,
 and jurisdiction cases. It exercises the production three-channel hybrid
 retriever (dense pgvector + Postgres full-text + lexical scheme-name matching,
 fused with RRF and kept source-diverse in the top-4) and fails on incomplete
-coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. On the full
-ingested corpus generation `7213926b8590933d...` (2,105 markdown files, ~20k
-chunks), run `34847304948` (pull request) and its follow-up on `main`
-(`34850488645`) measured **Hit@4 0.875** and **MRR@4 0.765625** across 16/16
-completed cases with 0 retrieval errors; each run uploads
-`retrieval_scores.json`. This is the measured result of those CI runs on that
-corpus generation, reproducible with `python -m eval.retrieval_gate` after
-ingest, not an ongoing production benchmark. The frozen measurement — the exact
-command, the corpus generation and chunk count, the embedding model, the date,
-and an explicit statement of what is *not* claimed — is recorded in
+coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. The gate was
+found to be **plan-dependent**: the lexical channel broke ties on unspecified
+Postgres row order, so the same corpus, model and configuration returned both
+0.875 and 0.8125. That is fixed by data-only tie-breaking. The now-reproducible
+measurement on the full ingested corpus generation `7213926b8590933d...`
+(2,105 markdown files, ~20k chunks) is **Hit@4 0.8125** and **MRR@4 0.75**
+across 16/16 completed cases with 0 retrieval errors, identical on 5 separate
+runs. That is **below the 0.85 floor, so the gate currently FAILS**; the floor
+was deliberately not lowered, and raising retrieval quality is a separate task.
+The deterministic misses are the PM-SYM Hinglish and unorganised-worker profile
+questions (no lexical anchor) plus the PM-KISAN colloquial question, where the
+auto-imported `myscheme/pm-kisan.md` now outranks the hand-verified
+`schemes/pm-kisan.md`. The frozen measurement — the exact command, the corpus
+generation and chunk count, the embedding model, the date, and an explicit
+statement of what is *not* claimed — is recorded in
 [`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
-quality remains a tracked metric, not a solved problem: the two remaining
-misses are the PM-SYM Hinglish question and the unorganised-worker profile
-question, which have no lexical anchor.
+quality remains a tracked metric, not a solved problem.
 
-<!-- claims: tests=507 evidence=20 -->
+<!-- claims: tests=509 evidence=20 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality

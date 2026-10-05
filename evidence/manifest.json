@@ -14,9 +14,9 @@
   "docs/evidence/FIELD-DRILL.md": "9794d2c4aec72d21",
   "docs/evidence/OFFLINE-GENERATION.md": "8663d84802647eef",
   "docs/evidence/PII-BENCHMARK.md": "9dbff3e1d9252f65",
-  "docs/evidence/RETRIEVAL-GATE.md": "7211510eb3daacb9",
+  "docs/evidence/RETRIEVAL-GATE.md": "5a48476d0468b319",
   "docs/evidence/SPINE-SECOND-CLIENT.md": "00380d2387a74e1f",
-  "eval/results/report.md": "d64b9e917638f077",
+  "eval/results/report.md": "568c83cdf5c47417",
   "loadtest/RESULTS.md": "c039f987ce04fab9",
   "loadtest/locustfile.py": "92ede893c7fa0440"
 }

@@ -210,10 +210,13 @@ def _generation_sources(corpus_generation: str | None) -> tuple[str, ...]:
         params["generation"] = corpus_generation
     with get_engine().connect() as conn:
         rows = conn.execute(
-            text(f"SELECT DISTINCT {source_expr} FROM {VECTOR_TABLE} WHERE {where}"),
+            text(
+                f"SELECT DISTINCT {source_expr} FROM {VECTOR_TABLE} WHERE {where} "
+                f"ORDER BY {source_expr}"
+            ),
             params,
         ).fetchall()
-    return tuple(str(row[0]) for row in rows if row[0])
+    return tuple(sorted(str(row[0]) for row in rows if row[0]))
 
 
 def _fetch_source_chunks(
@@ -232,7 +235,9 @@ def _fetch_source_chunks(
         return conn.execute(
             text(
                 f"SELECT content, {VECTOR_METADATA_COLUMN} "
-                f"FROM {VECTOR_TABLE} WHERE {where}"
+                f"FROM {VECTOR_TABLE} WHERE {where} "
+                f"ORDER BY {VECTOR_METADATA_COLUMN} ->> 'source', "
+                f"{VECTOR_METADATA_COLUMN} ->> 'chunk_index', content"
             ),
             params,
         ).fetchall()
@@ -280,25 +285,28 @@ def _lexical_search(
         )
         return []
 
-    ranked: list[tuple[int, int, int, Document, int]] = []
-    for order, row in enumerate(rows):
+    ranked: list[tuple[tuple, Document, int]] = []
+    for row in rows:
         content = row[0]
         metadata = row[1] or {}
         hits = _content_token_hits(content, tokens)
-        ranked.append(
-            (
-                -hits,
-                _chunk_index(metadata),
-                order,
-                Document(page_content=content, metadata=metadata),
-                hits,
-            )
+        doc = Document(page_content=content, metadata=metadata)
+        # The sort key must depend only on the row's data, never on the order
+        # Postgres happened to return rows in (which is unspecified absent an
+        # ORDER BY). ``source`` and the content hash are stable identifiers, so
+        # the ranked output is reproducible across plans.
+        key = (
+            -hits,
+            _chunk_index(metadata),
+            str(metadata.get("source") or ""),
+            _doc_id(doc),
         )
-    ranked.sort(key=lambda item: (item[0], item[1], item[2]))
+        ranked.append((key, doc, hits))
+    ranked.sort(key=lambda item: item[0])
 
     results: list[tuple[Document, float]] = []
     seen: set[object] = set()
-    for _neg_hits, _index, _order, doc, hits in ranked:
+    for _key, doc, hits in ranked:
         source = doc.metadata.get("source")
         if source in seen:
             continue

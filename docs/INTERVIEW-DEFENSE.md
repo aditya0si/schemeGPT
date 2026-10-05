@@ -94,14 +94,17 @@ quotes in it were verified".
 | --- | --- | --- | --- |
 | Corpus size | 2,105 markdown records (6 verified central, 36 state/UT seeds, 2,063 portal imports) | `data/` tree; each record carries `data_status` | `ls data/schemes/*.md data/states/*.md data/myscheme/*.md \| wc -l` |
 | Vector store | reported live by the deployment | PostgreSQL `langchain_pg_embedding` | `docker compose exec -T db psql -U scheme -d schemegpt -tAc "select count(*) from langchain_pg_embedding"` |
-| Retrieval quality | Hit@4 = 0.875, MRR@4 = 0.766 over 16 EN/HI/Hinglish/profile cases | Required CI eval gate on the full corpus; floors Hit@4 ≥ 0.85, MRR@4 ≥ 0.60 | `python -m eval.run_eval --gate` |
+| Retrieval quality | Hit@4 = 0.8125, MRR@4 = 0.75 over 16 EN/HI/Hinglish/profile cases (lexical tie-breaking was plan-dependent; now deterministic, and the gate currently fails the 0.85 floor — an open finding) | Required CI eval gate on the full corpus; floors Hit@4 ≥ 0.85, MRR@4 ≥ 0.60 | `python -m eval.retrieval_gate` |
 | Test suite | 125 pytest tests locally, no DB, no network, no LLM | `tests/` | `python -m pytest -q` |
 | CI | 4 jobs: data validation, unit tests, field kit, web build (+ weekly eval gate) | `.github/workflows/ci.yml`, `eval.yml` | `gh run list --limit 5` |
 | Provider ceiling | 8k tokens/minute on the free tier — a real throughput bound per instance | provider plan, stated in `docs/FIELD-DEPLOY.md` | `GET /metrics` token counters under load |
 
-**Say the caveat with the number.** "Hit@4 0.875 on 16 curated cases across
-three languages" is a claim about those cases, not about the corpus. The CI gate
-is what stops it drifting.
+**Say the caveat with the number.** "Hit@4 0.8125 on 16 curated cases across
+three languages" is a claim about those cases, not about the corpus. The earlier
+0.875 was plan-dependent — the lexical channel broke ties on unspecified
+Postgres row order — so it was corrected to the reproducible 0.8125 rather than
+kept. The deterministic CI gate is what stops it drifting; it currently fails
+its 0.85 floor, which is recorded as an open finding rather than papered over.
 
 ### Measured on a real deployment, not estimated
 

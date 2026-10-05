@@ -164,3 +164,48 @@ def test_hybrid_retriever_without_generation_stays_unfiltered():
 
     assert seen_filters == [None]
     assert "generation" not in fake_engine.conn.fetched
+
+
+def test_lexical_search_is_independent_of_fetched_row_order(monkeypatch):
+    """A tied lexical ranking must not depend on unspecified Postgres row order.
+
+    Two near-identical PM-KISAN copies tie on token overlap and ``chunk_index``.
+    Serving the same rows in reverse must not change which one ranks first.
+    """
+    import app.retrieval as retrieval
+
+    sources = ("myscheme/pm-kisan.md", "schemes/pm-kisan.md")
+    rows = [
+        ("pm kisan kisan benefit", {"source": "schemes/pm-kisan.md", "chunk_index": 0}),
+        ("pm kisan kisan benefit", {"source": "myscheme/pm-kisan.md", "chunk_index": 0}),
+        ("pm kisan benefit", {"source": "schemes/pm-kisan.md", "chunk_index": 1}),
+    ]
+    monkeypatch.setattr(retrieval, "_generation_sources", lambda generation: sources)
+
+    calls: list[int] = []
+
+    def fake_fetch(matched_sources, corpus_generation):
+        calls.append(1)
+        return rows if len(calls) % 2 else list(reversed(rows))
+
+    monkeypatch.setattr(retrieval, "_fetch_source_chunks", fake_fetch)
+
+    first = [doc.metadata["source"] for doc, _ in retrieval._lexical_search("pm kisan")]
+    second = [doc.metadata["source"] for doc, _ in retrieval._lexical_search("pm kisan")]
+
+    assert first == second
+    assert first == ["myscheme/pm-kisan.md", "schemes/pm-kisan.md"]
+
+
+def test_generation_sources_returns_a_deterministic_order(monkeypatch):
+    """``_generation_sources`` must not leak the DISTINCT scan's row order."""
+    import app.retrieval as retrieval
+
+    rows = [("schemes/z.md",), ("schemes/a.md",)]
+    monkeypatch.setattr(retrieval, "get_engine", lambda: _fake_engine(rows))
+    retrieval._generation_sources.cache_clear()
+    try:
+        assert retrieval._generation_sources("gen") == ("schemes/a.md", "schemes/z.md")
+    finally:
+        retrieval._generation_sources.cache_clear()
+
