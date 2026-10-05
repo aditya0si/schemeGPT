@@ -13,6 +13,12 @@ first token): stream a retrieval-only answer assembled from source excerpts.
 Demo path (no key or unknown corpus generation): stream the pre-made demo
 answer with the same labelled honesty as POST /query. A failure AFTER tokens
 started emits ``error`` and closes; the client keeps the partial text.
+
+PII (Phase 6c): the inbound question is tokenised with one request-scoped
+``Vault`` before it reaches a provider, and every outbound token passes through
+a bounded overlap buffer (``app.guardrails.stream``) that restores the
+pre-generation placeholders and redacts identifiers found in the streamed text.
+A PII-bearing request bypasses the semantic cache here too.
 """
 
 import json
@@ -22,6 +28,7 @@ from typing import AsyncIterator
 import anyio
 
 from app import metrics, semantic_cache
+from app.guardrails.stream import StreamRedactor
 from app.ops import ops as operator
 from app.rag import (
     _build_profile_context,
@@ -94,10 +101,12 @@ async def _stream_fallback(payload: dict, lang: str) -> AsyncIterator[str]:
     )
 
 
-async def stream_answer(
+async def _stream_answer_core(
     question: str,
     language: str = "en",
     profile: ProfileData | None = None,
+    *,
+    skip_cache: bool = False,
 ) -> AsyncIterator[str]:
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
@@ -157,9 +166,11 @@ async def stream_answer(
         # Semantic cache: serve a stored live answer for a semantically equal
         # question (same language + profile) with the identical event shape.
         ph = semantic_cache.profile_hash(profile)
-        cached = await anyio.to_thread.run_sync(
-            semantic_cache.lookup, question, lang, ph, generation
-        )
+        cached = None
+        if not skip_cache:
+            cached = await anyio.to_thread.run_sync(
+                semantic_cache.lookup, question, lang, ph, generation
+            )
         if cached is not None:
             cached = semantic_cache.revalidate_payload(cached)
             yield _sse("sources", cached.get("sources", []))
@@ -220,20 +231,21 @@ async def stream_answer(
         usage.record(settings.groq_model)
         operator.record_provider_success()
         metrics.inc("queries_live")
-        await anyio.to_thread.run_sync(
-            semantic_cache.store,
-            question,
-            lang,
-            ph,
-            {
-                "answer": "".join(answer_parts),
-                "sources": source_payload,
-                "quotes": [q.__dict__ for q in verified] if verified else [],
-                "mode": "live",
-                "language": lang,
-            },
-            generation,
-        )
+        if not skip_cache:
+            await anyio.to_thread.run_sync(
+                semantic_cache.store,
+                question,
+                lang,
+                ph,
+                {
+                    "answer": "".join(answer_parts),
+                    "sources": source_payload,
+                    "quotes": [q.__dict__ for q in verified] if verified else [],
+                    "mode": "live",
+                    "language": lang,
+                },
+                generation,
+            )
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:
         if tokens_sent:
@@ -267,3 +279,73 @@ async def stream_answer(
         )
         async for event in _stream_fallback(payload, lang):
             yield event
+
+
+def _parse_event(part: str) -> tuple[str | None, dict | None]:
+    """Decode one SSE block emitted by :func:`_sse` (name, data)."""
+    name: str | None = None
+    data: dict | None = None
+    for line in part.split("\n"):
+        if line.startswith("event: "):
+            name = line[len("event: "):]
+        elif line.startswith("data: "):
+            data = json.loads(line[len("data: "):])
+    return name, data
+
+
+async def stream_answer(
+    question: str,
+    language: str = "en",
+    profile: ProfileData | None = None,
+) -> AsyncIterator[str]:
+    """Stream an answer with request-scoped PII redaction (Phase 6c).
+
+    One fresh ``Vault`` is created for the request. The question is tokenised
+    with it before it reaches retrieval or a provider; ``_stream_answer_core``
+    then runs with the redacted question and, when PII was present, with the
+    semantic cache bypassed (the same cross-request rule as ``POST /query``).
+
+    Every outbound ``token`` is passed through a :class:`StreamRedactor`, a
+    bounded overlap buffer that restores the placeholders the question produced
+    and redacts any raw identifier found in the streamed text. The held tail is
+    flushed once, immediately before the first ``quotes``/``done`` event, so
+    token events still precede both terminal events. On a mid-stream ``error``
+    or a client disconnect the tail is discarded, never emitted.
+    """
+    if not getattr(settings, "enable_pii_vault", True):
+        async for part in _stream_answer_core(question, language, profile):
+            yield part
+        return
+
+    redactor, redacted_question = StreamRedactor.for_question(question)
+    flushed = False
+    saw_error = False
+    try:
+        async for part in _stream_answer_core(
+            redacted_question,
+            language,
+            profile,
+            skip_cache=redactor.has_pii,
+        ):
+            name, data = _parse_event(part)
+            if name == "token":
+                safe = redactor.feed(data.get("text", "") if data else "")
+                if safe:
+                    yield _sse("token", {"text": safe})
+                continue
+            if name == "error":
+                saw_error = True
+            if name in ("quotes", "done") and not flushed:
+                tail = redactor.flush()
+                flushed = True
+                if tail:
+                    yield _sse("token", {"text": tail})
+            yield part
+        if not flushed and not saw_error:
+            tail = redactor.flush()
+            flushed = True
+            if tail:
+                yield _sse("token", {"text": tail})
+    finally:
+        if not flushed:
+            redactor.discard()

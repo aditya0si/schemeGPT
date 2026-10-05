@@ -47,6 +47,12 @@ _NONCE_BYTES = 4
 _PLACEHOLDER_TEMPLATE = "[[PII:{nonce}:{kind}:{index}]]"
 _PLACEHOLDER_RE = re.compile(r"\[\[PII:[0-9a-f]{8}:[A-Z_]+:\d+\]\]")
 
+# Public handle for the complete-placeholder grammar. The streaming redactor
+# (``app.guardrails.stream``) uses it to take a snapshot of the placeholders a
+# question produced *before* generation, so it can restore exactly those and
+# leave placeholders minted later for streamed identifiers redacted.
+PLACEHOLDER_RE = _PLACEHOLDER_RE
+
 
 class Vault:
     """A single request's reversible PII mapping.
