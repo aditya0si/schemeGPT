@@ -4,17 +4,15 @@ Loads the central scheme Markdown docs from the configured data directory and
 the nationwide state/Union Territory directory seed docs from ``data/states``
 (when present), splits them into chunks, enriches every chunk with catalog
 metadata (``source``, ``jurisdiction``, ``state``, ``data_status``,
-``last_verified``), and adds vectors with content-hash ids so re-runs are
-idempotent and existing vectors are never deleted.
+``last_verified``), embeds the complete corpus before any database write, and
+atomically upserts source-aware chunks while deleting stale rows.
 
 The state directory is picked up automatically: a stale ``DATA_DIR=data/schemes``
 value in ``.env`` does not need to be edited, and ``DATA_DIR=data`` (the data
 root) is also supported via a recursive scan.
 
-Chunks are identified by a content hash. Ids that already exist in the vector
-collection are not re-inserted: their metadata is refreshed in place when the
-catalog metadata changes, so runs stay idempotent and existing vectors are
-never deleted.
+Chunk ids include canonical source, position, and content. Identical policy
+boilerplate in different files therefore retains each file's provenance.
 """
 
 import hashlib
@@ -22,18 +20,29 @@ import json
 import logging
 from pathlib import Path
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy import text
 
 from app.catalog import load_schemes_by_source, load_states_catalog, slugify
 from app.config import ROOT_DIR, data_dir_path, settings
-from app.db import COLLECTION_NAME, get_engine, get_vectorstore
+from app.db import (
+    VECTOR_GENERATION_COLUMN,
+    VECTOR_ID_COLUMN,
+    VECTOR_METADATA_COLUMN,
+    VECTOR_TABLE,
+    ensure_fts_index,
+    ensure_vector_table,
+    get_embeddings,
+    get_engine,
+    record_corpus_state,
+)
 
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 150
+INGEST_ADVISORY_LOCK_ID = 0x53434845  # stable application-scoped "SCHE" lock
 
 
 def _data_root() -> Path:
@@ -90,57 +99,6 @@ def _state_name_from_filename(rel_source: str) -> str | None:
     return None
 
 
-def _existing_id_metadata() -> dict[str, dict]:
-    """Map content-hash id -> stored metadata for this vector collection.
-
-    PGVector's ``add_texts`` performs a plain insert (no upsert), so ids that
-    already exist are either skipped (idempotent) or have only their metadata
-    refreshed in place. Existing vectors are never deleted.
-    """
-    try:
-        with get_engine().connect() as conn:
-            table_exists = conn.execute(
-                text("SELECT to_regclass('public.langchain_pg_embedding')")
-            ).scalar()
-            if table_exists is None:
-                return {}
-            rows = conn.execute(
-                text(
-                    "SELECT e.custom_id, e.cmetadata "
-                    "FROM langchain_pg_embedding e "
-                    "JOIN langchain_pg_collection c ON e.collection_id = c.uuid "
-                    "WHERE c.name = :name AND e.custom_id IS NOT NULL"
-                ),
-                {"name": COLLECTION_NAME},
-            ).fetchall()
-        return {
-            row[0]: (row[1] or {}) for row in rows
-        }
-    except Exception:
-        logger.warning(
-            "Could not query existing vector ids; treating the store as empty.",
-            exc_info=True,
-        )
-        return {}
-
-
-def _update_chunk_metadata(updates: list[tuple[str, dict]]) -> None:
-    """Refresh metadata of already-ingested chunks in place (no vector changes)."""
-    if not updates:
-        return
-    with get_engine().begin() as conn:
-        for chunk_id, meta in updates:
-            conn.execute(
-                text(
-                    "UPDATE langchain_pg_embedding SET cmetadata = :meta "
-                    "WHERE custom_id = :chunk_id AND collection_id IN ("
-                    "  SELECT c.uuid FROM langchain_pg_collection c WHERE c.name = :collection"
-                    ")"
-                ),
-                {"meta": json.dumps(meta), "chunk_id": chunk_id, "collection": COLLECTION_NAME},
-            )
-
-
 def _chunk_metadata(rel_source: str) -> dict:
     """Enrich a chunk with catalog metadata when available."""
     meta: dict = {"source": rel_source}
@@ -171,57 +129,153 @@ def _chunk_metadata(rel_source: str) -> dict:
     return meta
 
 
+def _load_markdown_documents(directory: Path, recursive: bool) -> list[Document]:
+    """Read UTF-8 Markdown sources without the heavyweight community loaders."""
+    pattern = "**/*.md" if recursive else "*.md"
+    return [
+        Document(
+            page_content=path.read_text(encoding="utf-8"),
+            metadata={"source": str(path)},
+        )
+        for path in sorted(directory.glob(pattern))
+        if path.is_file()
+    ]
+
+
+def _chunk_id(rel_source: str, chunk_index: int, content: str) -> str:
+    """Stable source-and-position-aware chunk id; duplicate text never aliases."""
+    identity = f"{rel_source}\0{chunk_index}\0{content}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def _corpus_generation(rows: list[dict], model_name: str) -> str:
+    """Deterministic generation id covering model, content, ids, and provenance."""
+    canonical = json.dumps(
+        {"embedding_model": model_name, "rows": rows},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _vector_literal(vector: list[float]) -> str:
+    return "[" + ",".join(f"{value:.9g}" for value in vector) + "]"
+
+
+def _acquire_activation_lock(connection) -> None:
+    """Serialize corpus activation across every API worker.
+
+    ``pg_advisory_xact_lock`` is transaction-scoped, so it is held until the
+    enclosing transaction commits or rolls back. It MUST be the first statement
+    of the activation transaction: two concurrent rebuilds then cannot
+    interleave their upsert, stale-row deletion, or state-marker writes and
+    leave a mixed-generation corpus behind.
+    """
+    connection.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_id)"),
+        {"lock_id": INGEST_ADVISORY_LOCK_ID},
+    )
+
+
+def _replace_corpus(rows: list[dict]) -> int:
+    """Embed fully, then atomically activate all current rows and remove stale ones."""
+    if not rows:
+        raise ValueError("No Markdown chunks found; refusing to replace the corpus.")
+
+    generation = _corpus_generation(rows, settings.embedding_model)
+    vectors = get_embeddings().embed_documents([row["content"] for row in rows])
+    if len(vectors) != len(rows) or not vectors or not vectors[0]:
+        raise RuntimeError("Embedding model returned incomplete corpus vectors.")
+    vector_size = len(vectors[0])
+    if any(len(vector) != vector_size for vector in vectors):
+        raise RuntimeError("Embedding model returned inconsistent vector dimensions.")
+
+    # No database mutation occurs until every embedding is available. Table
+    # existence is prepared outside the lock (idempotent schema setup); the
+    # activation below is serialized by a transaction-scoped advisory lock and
+    # commits once, so readers see either the previous or the new generation.
+    ensure_vector_table(vector_size)
+    params = [
+        {
+            "chunk_id": row["id"],
+            "content": row["content"],
+            "embedding": _vector_literal(vector),
+            "metadata": json.dumps(row["metadata"], ensure_ascii=False),
+            "generation": generation,
+        }
+        for row, vector in zip(rows, vectors, strict=True)
+    ]
+    with get_engine().begin() as conn:
+        _acquire_activation_lock(conn)
+        conn.execute(
+            text(
+                f"INSERT INTO {VECTOR_TABLE} "
+                f"({VECTOR_ID_COLUMN}, content, embedding, "
+                f"{VECTOR_METADATA_COLUMN}, {VECTOR_GENERATION_COLUMN}) "
+                "VALUES (:chunk_id, :content, CAST(:embedding AS vector), "
+                "CAST(:metadata AS JSON), :generation) "
+                f"ON CONFLICT ({VECTOR_ID_COLUMN}) DO UPDATE SET "
+                "content = EXCLUDED.content, embedding = EXCLUDED.embedding, "
+                f"{VECTOR_METADATA_COLUMN} = EXCLUDED.{VECTOR_METADATA_COLUMN}, "
+                f"{VECTOR_GENERATION_COLUMN} = EXCLUDED.{VECTOR_GENERATION_COLUMN}"
+            ),
+            params,
+        )
+        conn.execute(
+            text(
+                f"DELETE FROM {VECTOR_TABLE} "
+                f"WHERE {VECTOR_GENERATION_COLUMN} IS DISTINCT FROM :generation"
+            ),
+            {"generation": generation},
+        )
+        record_corpus_state(
+            model_name=settings.embedding_model,
+            generation=generation,
+            chunk_count=len(rows),
+            connection=conn,
+        )
+        # FTS lives in the same transaction as the rows it indexes. A missing
+        # column would silently degrade evaluation to vector-only, so a failure
+        # rolls the whole activation back (fail closed) instead of committing a
+        # corpus that cannot be searched textually.
+        ensure_fts_index(connection=conn)
+    return len(rows)
+
+
 def ingest(data_dir: Path | None = None) -> int:
-    """Ingest all Markdown sources; returns the total number of chunks."""
+    """Reconcile the vector table atomically with all current Markdown sources."""
     configured = (data_dir or data_dir_path()).resolve()
     data_root = _data_root()
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
     )
-    existing_metadata = _existing_id_metadata()
-
-    texts: list[str] = []
-    metadatas: list[dict] = []
-    ids: list[str] = []
-    metadata_updates: list[tuple[str, dict]] = []
-    total_chunks = 0
+    rows: list[dict] = []
+    source_positions: dict[str, int] = {}
 
     for directory in _plan_directories(configured):
         if not directory.is_dir():
             logger.warning("Ingest directory not found; skipping: %s", directory)
             continue
-        loader = DirectoryLoader(
-            str(directory),
-            glob="*.md",
-            loader_cls=TextLoader,
-            loader_kwargs={"encoding": "utf-8"},
-            recursive=directory == data_root,
+        docs = _load_markdown_documents(
+            directory, recursive=directory == data_root
         )
-        docs = loader.load()
-        chunks = splitter.split_documents(docs)
-        total_chunks += len(chunks)
-        for chunk in chunks:
+        for chunk in splitter.split_documents(docs):
             rel_source = _relative_source(
                 Path(chunk.metadata["source"]), data_root
             )
-            chunk_id = hashlib.md5(chunk.page_content.encode("utf-8")).hexdigest()
-            meta = _chunk_metadata(rel_source)
-            previous = existing_metadata.get(chunk_id)
-            if previous is None:
-                # New content: insert a new vector.
-                texts.append(chunk.page_content)
-                metadatas.append(meta)
-                ids.append(chunk_id)
-            elif previous != meta:
-                # Same content already ingested: refresh metadata only.
-                metadata_updates.append((chunk_id, meta))
+            chunk_index = source_positions.get(rel_source, 0)
+            source_positions[rel_source] = chunk_index + 1
+            metadata = {
+                **_chunk_metadata(rel_source),
+                "chunk_index": chunk_index,
+            }
+            rows.append(
+                {
+                    "id": _chunk_id(rel_source, chunk_index, chunk.page_content),
+                    "content": chunk.page_content,
+                    "metadata": metadata,
+                }
+            )
 
-    if texts:
-        get_vectorstore().add_texts(texts=texts, metadatas=metadatas, ids=ids)
-    _update_chunk_metadata(metadata_updates)
-    # Record which embedding model produced this collection's vectors so
-    # startup can warn when the configured model changes (see app.db).
-    from app.db import record_embedding_model
-
-    record_embedding_model(settings.embedding_model)
-    return total_chunks
+    return _replace_corpus(rows)

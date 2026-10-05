@@ -3,12 +3,14 @@
 Event protocol (terminal event is always ``done`` or ``error``):
 - ``sources``: list of retrieved source dicts (provenance included)
 - ``token``:   ``{"text": str}`` answer fragment, in order
-- ``done``:    ``{"mode": "live"|"demo", "notice": str|None, "language": ...}``
+- ``done``:    ``{"mode": "live"|"degraded"|"demo", "notice": str|None, ...}``
 - ``error``:   ``{"message": str}`` mid-stream failure notice
 
 Live path: normalize the question (cheap LLM rewrite, best-effort), retrieve
-from pgvector, then stream the stuff-documents chain answer tokens. Demo path
-(no key or any live failure before the first token): stream the pre-made demo
+from pgvector, then stream the stuff-documents chain answer tokens. Degraded
+path (AI switched off, provider circuit open, or a provider failure before the
+first token): stream a retrieval-only answer assembled from source excerpts.
+Demo path (no key or unknown corpus generation): stream the pre-made demo
 answer with the same labelled honesty as POST /query. A failure AFTER tokens
 started emits ``error`` and closes; the client keeps the partial text.
 """
@@ -20,16 +22,15 @@ from typing import AsyncIterator
 import anyio
 
 from app import metrics, semantic_cache
-from app.agent import needs_multi_step, run_agent_gather
 from app.ops import ops as operator
 from app.rag import (
     _build_profile_context,
     _normalize_language,
     build_answer_chain,
+    demo_answer,
     fallback_answer,
     get_llm,
-    get_retriever,
-    normalize_question,
+    retrieve_context,
     TokenUsageHandler,
 )
 from app.config import settings
@@ -100,11 +101,20 @@ async def stream_answer(
 ) -> AsyncIterator[str]:
     lang = _normalize_language(language)
     profile_context = _build_profile_context(profile, lang)
+
+    # Keep demo-mode requests database-free and match synchronous behavior.
+    # Handled outside the provider-failure boundary deliberately: an
+    # unconfigured instance is not a failing provider and must not count
+    # against the circuit breaker.
+    if not settings.groq_api_key.strip():
+        demo = await anyio.to_thread.run_sync(demo_answer, question, lang)
+        async for event in _stream_fallback(demo, lang):
+            yield event
+        return
+
     tokens_sent = False
     answer_parts: list[str] = []
     try:
-        # Fail fast (no key -> ValueError) before touching the DB.
-        get_llm()
         # Operator state, consulted once. The kill switch bypasses the semantic
         # cache (stop serving generated text, not just stop generating it) while
         # the breaker does not (an availability problem should still be able to
@@ -117,13 +127,41 @@ async def stream_answer(
             async for event in _stream_fallback(payload, lang):
                 yield event
             return
+        # Capture the corpus generation once and carry it through lookup,
+        # retrieval, and store, matching the synchronous /query path exactly.
+        # An unknown generation fails closed: the stream returns the labelled
+        # demo answer rather than running an unbound retrieval or an unnamed
+        # cache namespace.
+        try:
+            generation = await anyio.to_thread.run_sync(
+                semantic_cache.capture_generation
+            )
+        except Exception as exc:
+            logger.error(
+                "Corpus generation metadata unavailable (%s); streaming demo "
+                "answer.",
+                type(exc).__name__,
+            )
+            demo = await anyio.to_thread.run_sync(demo_answer, question, lang)
+            async for event in _stream_fallback(demo, lang):
+                yield event
+            return
+        if not generation:
+            logger.error(
+                "Corpus generation is uninitialized; streaming demo answer."
+            )
+            demo = await anyio.to_thread.run_sync(demo_answer, question, lang)
+            async for event in _stream_fallback(demo, lang):
+                yield event
+            return
         # Semantic cache: serve a stored live answer for a semantically equal
         # question (same language + profile) with the identical event shape.
         ph = semantic_cache.profile_hash(profile)
         cached = await anyio.to_thread.run_sync(
-            semantic_cache.lookup, question, lang, ph
+            semantic_cache.lookup, question, lang, ph, generation
         )
         if cached is not None:
+            cached = semantic_cache.revalidate_payload(cached)
             yield _sse("sources", cached.get("sources", []))
             answer_text = cached.get("answer", "")
             for i in range(0, len(answer_text), 80):
@@ -143,42 +181,19 @@ async def stream_answer(
             async for event in _stream_fallback(payload, lang):
                 yield event
             return
-        if needs_multi_step(question, profile):
-            metrics.inc("agent_routes_total")
-            try:
-                with stage_span("agent_gather"):
-                    docs, steps = await anyio.to_thread.run_sync(
-                        run_agent_gather, question, lang, profile
-                    )
-            except Exception as exc:
-                # Agent loop failed: degrade to single-shot retrieval rather
-                # than dropping to demo mode for a live-configured stack.
-                logger.warning("Agent retrieval failed (%s); single-shot path.", type(exc).__name__)
-                with stage_span("normalize"):
-                    normalized = await anyio.to_thread.run_sync(
-                        normalize_question, question
-                    )
-                with stage_span("retrieve") as span:
-                    docs = await anyio.to_thread.run_sync(
-                        lambda: get_retriever().invoke(normalized)
-                    )
-                    if span is not None:
-                        span.set_attribute("docs.count", len(docs))
-                steps = []
-            for step in steps:
-                yield _sse("step", step)
-        else:
-            with stage_span("normalize"):
-                normalized = await anyio.to_thread.run_sync(
-                    normalize_question, question
-                )
-            with stage_span("retrieve") as span:
-                docs = await anyio.to_thread.run_sync(
-                    lambda: get_retriever().invoke(normalized)
-                )
-                if span is not None:
-                    span.set_attribute("docs.count", len(docs))
-        yield _sse("sources", [_source_dict(doc) for doc in docs])
+        # A valid cache hit avoids a provider call; a miss validates the client
+        # before retrieval and falls back cleanly if provider setup is invalid.
+        get_llm()
+        with stage_span("retrieve") as span:
+            docs, steps = await anyio.to_thread.run_sync(
+                retrieve_context, question, lang, profile, generation
+            )
+            if span is not None:
+                span.set_attribute("docs.count", len(docs))
+        for step in steps:
+            yield _sse("step", step)
+        source_payload = [_source_dict(doc) for doc in docs]
+        yield _sse("sources", source_payload)
         chain = build_answer_chain(lang)
         usage = TokenUsageHandler()
         with stage_span("generate"):
@@ -197,7 +212,9 @@ async def stream_answer(
                 answer_parts.append(text)
                 yield _sse("token", {"text": text})
         with stage_span("verify_quotes"):
-            verified = verify_quotes(parse_quotes("".join(answer_parts)), docs)
+            verified = verify_quotes(
+                parse_quotes("".join(answer_parts)), source_payload
+            )
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
         usage.record(settings.groq_model)
@@ -210,11 +227,12 @@ async def stream_answer(
             ph,
             {
                 "answer": "".join(answer_parts),
-                "sources": [_source_dict(doc) for doc in docs],
+                "sources": source_payload,
                 "quotes": [q.__dict__ for q in verified] if verified else [],
                 "mode": "live",
                 "language": lang,
             },
+            generation,
         )
         yield _sse("done", {"mode": "live", "notice": None, "language": lang})
     except Exception as exc:

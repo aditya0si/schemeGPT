@@ -112,15 +112,19 @@ directory — paths are resolved relative to the script location).
 
 ## Re-ingest
 
-- Startup auto-ingestion is unchanged: on API start, if the vector store is
-  empty, `app/ingest.ingest()` ingests `data/schemes/*.md` and
-  `data/states/*.md` idempotently (content-hash chunk ids; existing vectors are
-  never deleted).
+- Startup auto-ingestion runs when the application vector table is empty.
+- Every ingestion computes all embeddings before database mutation, then takes a
+  transaction-scoped PostgreSQL advisory lock and uses a single transaction to
+  upsert source-and-position-aware chunks, delete rows absent from the current
+  corpus, activate the matching model/generation marker, and ensure the
+  full-text column/index. The lock serializes concurrent rebuilds, so two
+  rebuilds cannot interleave and leave a mixed-generation corpus. A failed
+  embedding or transaction leaves the previous corpus active.
 - Manual re-ingest: `POST /ingest` with the `X-Admin-Token` header equal to
   `ADMIN_TOKEN`. If `ADMIN_TOKEN` is blank the endpoint returns 503
   (disabled) — a public unauthenticated re-ingest endpoint is not acceptable.
-- Idempotency: re-runs skip unchanged chunks and refresh catalog metadata in
-  place; they never delete vectors.
+- Identical text from different source files remains independently traceable;
+  deleted or edited source chunks are removed during reconciliation.
 
 ## Never
 

@@ -1,16 +1,16 @@
-"""Regression-gate floor logic for the RAGAS harness (pure, no RAGAS needed)."""
+"""Regression-gate logic for the live generation judge harness."""
 
 from eval.run_eval import GATE_FLOORS, check_gate
 
 
 def test_gate_floors_are_defined():
-    assert set(GATE_FLOORS) == {"faithfulness", "answer_relevancy"}
-    assert all(v > 0 for v in GATE_FLOORS.values())
+    assert GATE_FLOORS["faithfulness"] >= 0.85
+    assert GATE_FLOORS["answer_relevancy"] >= 0.70
 
 
-def test_gate_passes_when_all_above_floor():
+def test_gate_passes_when_all_above_floor_and_complete():
     agg = {"faithfulness": 0.95, "answer_relevancy": 0.80}
-    assert check_gate(agg) == []
+    assert check_gate(agg, scored_count=20, expected_count=20, error_count=0) == []
 
 
 def test_gate_flags_only_the_offending_metric():
@@ -22,34 +22,59 @@ def test_gate_flags_only_the_offending_metric():
 
 
 def test_gate_flags_metric_at_exact_boundary_below():
-    agg = {"faithfulness": GATE_FLOORS["faithfulness"] - 0.001, "answer_relevancy": 1.0}
+    agg = {
+        "faithfulness": GATE_FLOORS["faithfulness"] - 0.001,
+        "answer_relevancy": 1.0,
+    }
     assert check_gate(agg)
 
 
 def test_gate_flags_missing_metric():
-    agg = {"faithfulness": 0.95}  # answer_relevancy missing
+    agg = {"faithfulness": 0.95}
     assert check_gate(agg)
 
 
+def test_gate_cannot_pass_with_one_perfect_row_and_nineteen_missing():
+    agg = {"faithfulness": 1.0, "answer_relevancy": 1.0}
+    failures = check_gate(
+        agg,
+        scored_count=1,
+        expected_count=20,
+        error_count=19,
+    )
+    assert any("coverage" in failure for failure in failures)
+    assert any("errors" in failure for failure in failures)
+
+
+def test_gate_rejects_inconsistent_counts_even_without_recorded_errors():
+    failures = check_gate(
+        {"faithfulness": 1.0, "answer_relevancy": 1.0},
+        scored_count=19,
+        expected_count=20,
+        error_count=0,
+    )
+    assert any("19/20" in failure for failure in failures)
+
+
 def test_build_cases_carries_all_metrics():
-    """Regression: _aggregate iterates every METRICS name, so each case must
-    carry all four keys (previously raised KeyError: 'context_precision')."""
+    """Every report case carries every metric even when the judge returns none."""
     from eval.run_eval import METRICS, _build_cases
 
-    rows = [
-        {
-            "question": "q",
-            "answer": "a",
-            "contexts": ["c"],
-            "reference": "r",
-            "metrics": {"faithfulness": 1.0, "answer_relevancy": 0.9,
-                        "context_precision": 0.8, "context_recall": 0.7},
-            "error": None,
-        }
-    ]
-    case = _build_cases(rows)[0]
+    cases = _build_cases(
+        [
+            {
+                "question": "q",
+                "reference": "r",
+                "answer": "a",
+                "contexts": ["c"],
+                "sources": [],
+                "metrics": {name: 1.0 for name in METRICS},
+                "error": None,
+            }
+        ]
+    )
     for name in METRICS:
-        assert name in case
+        assert name in cases[0]
 
 
 def test_aggregate_handles_all_metric_names():
@@ -59,9 +84,10 @@ def test_aggregate_handles_all_metric_names():
         [
             {
                 "question": "q",
+                "reference": "r",
                 "answer": "a",
-                "contexts": [],
-                "reference": "",
+                "contexts": ["c"],
+                "sources": [],
                 "metrics": {name: 1.0 for name in METRICS},
                 "error": None,
             }
@@ -69,3 +95,34 @@ def test_aggregate_handles_all_metric_names():
     )
     agg = _aggregate(cases)
     assert all(agg[name] == 1.0 for name in METRICS)
+
+
+def test_parse_judge_scores_accepts_fenced_json():
+    from eval.run_eval import _parse_judge_scores
+
+    scores = _parse_judge_scores(
+        "```json\n"
+        '{"faithfulness": 0.9, "answer_relevancy": 0.8, '
+        '"context_precision": 0.7, "context_recall": 0.6}'
+        "\n```"
+    )
+    assert scores == {
+        "faithfulness": 0.9,
+        "answer_relevancy": 0.8,
+        "context_precision": 0.7,
+        "context_recall": 0.6,
+    }
+
+
+def test_parse_judge_scores_rejects_missing_or_out_of_range_metrics():
+    from eval.run_eval import _parse_judge_scores
+
+    import pytest
+
+    with pytest.raises(ValueError, match="missing"):
+        _parse_judge_scores('{"faithfulness": 0.9}')
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        _parse_judge_scores(
+            '{"faithfulness": 1.1, "answer_relevancy": 0.8, '
+            '"context_precision": 0.7, "context_recall": 0.6}'
+        )

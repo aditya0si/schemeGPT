@@ -1,79 +1,41 @@
-"""Re-embed the vector store after changing the embedding model.
-
-Deletes this collection's existing vectors and re-ingests every Markdown source
-with the configured embedding model. Idempotent afterwards.
+"""Atomically rebuild SchemeGPT vectors after corpus or model changes.
 
 Usage:
-    python scripts/reembed.py --yes
-    python -m pip show --quiet sentence-transformers  # model downloads on demand
+    python scripts/reembed.py
 
-Requires a running database (docker compose up -d db). --yes is required:
-deleting vectors is destructive-until-reingest and must be explicit.
+The ingestion pipeline computes every embedding before opening its replacement
+transaction. Existing rows remain active if embedding or database work fails;
+there is no pre-emptive table drop.
 """
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
-# Direct invocation (`python scripts/reembed.py`) must see the repo root.
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import logging  # noqa: E402
-
-from sqlalchemy import text  # noqa: E402
+import app.ingest as ingestion  # noqa: E402
+from app.config import settings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
-from app.config import settings  # noqa: E402
-from app.db import COLLECTION_NAME, get_engine  # noqa: E402
 
-
-def _delete_collection_vectors() -> int:
-    with get_engine().begin() as conn:
-        # Fresh databases have no vector tables until the first
-        # get_vectorstore() call creates them; there is nothing to delete.
-        table_exists = conn.execute(
-            text("SELECT to_regclass('public.langchain_pg_embedding')")
-        ).scalar()
-        if table_exists is None:
-            return 0
-        result = conn.execute(
-            text(
-                "DELETE FROM langchain_pg_embedding "
-                "WHERE collection_id IN ("
-                "  SELECT c.uuid FROM langchain_pg_collection c WHERE c.name = :name"
-                ")"
-            ),
-            {"name": COLLECTION_NAME},
-        )
-        return result.rowcount
-
-
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--yes", action="store_true", help="confirm deletion of existing vectors"
+        "--yes",
+        action="store_true",
+        help=argparse.SUPPRESS,  # accepted for backward-compatible automation
     )
-    args = parser.parse_args()
-    if not args.yes:
-        print(
-            "This deletes the existing vector store so it can be re-embedded "
-            "with the configured model. Refusing without --yes.",
-            file=sys.stderr,
-        )
-        return 2
+    parser.parse_args(argv)
 
-    deleted = _delete_collection_vectors()
-    print(f"Deleted {deleted or 0} existing vector(s).")
-
-    from app.ingest import ingest
-
-    chunks = ingest()
+    chunks = ingestion.ingest()
     print(
-        f"Re-ingested with embedding model '{settings.embedding_model}' "
-        f"({chunks} chunks). Restart the API to clear the stale provenance warning."
+        f"Atomically rebuilt '{settings.embedding_model}' corpus "
+        f"with {chunks} chunks. Restart the API to clear cached retrievers."
     )
     return 0
 

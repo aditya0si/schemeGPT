@@ -79,9 +79,21 @@ class Source(BaseModel):
     source_url: str | None = None
 
 
+class VerifiedQuote(BaseModel):
+    """A model quote checked against its specifically named retrieved source."""
+
+    text: str
+    source: str
+    status: str | None = None
+    verified: bool
+    matched_source: str | None = None
+
+
 class QueryResponse(BaseModel):
     answer: str
     sources: list[Source]
+    quotes: list[VerifiedQuote] = Field(default_factory=list)
+    steps: list[dict[str, str]] = Field(default_factory=list)
     # Backwards-compatible additions for the pre-made demo fallback. Clients
     # that only read `answer` and `sources` are unaffected; `mode` defaults to
     # "live" so existing callers keep working unchanged.

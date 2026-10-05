@@ -3,14 +3,21 @@
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 export async function POST(req: Request) {
-  const upstream = await fetch(`${API_URL}/feedback`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: await req.text(),
-    cache: "no-store",
-  });
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: { "content-type": "application/json" },
-  });
+  try {
+    const upstream = await fetch(`${API_URL}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: await req.text(),
+      cache: "no-store",
+    });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { "content-type": "application/json" },
+    });
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Feedback backend unreachable." }),
+      { status: 502, headers: { "content-type": "application/json" } },
+    );
+  }
 }

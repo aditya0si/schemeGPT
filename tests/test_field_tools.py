@@ -197,7 +197,7 @@ def test_env_file_checks(repo):
 
     (repo / ".env").write_text(
         "GROQ_API_KEY=secret-value-should-never-print\n"
-        "DATABASE_URL=postgresql+psycopg2://scheme:scheme@db:5432/schemegpt\n"
+        "DATABASE_URL=postgresql+psycopg://scheme:scheme@db:5432/schemegpt\n"
         "ADMIN_TOKEN=another-secret\n",
         encoding="utf-8",
     )

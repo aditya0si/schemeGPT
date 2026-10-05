@@ -1,22 +1,38 @@
-name: RAGAS eval gate
-
-# Offline RAG evaluation with regression gate over the real stack: a
-# pgvector service container + local e5 embeddings + Groq as the answer and
-# judge LLM. Requires the GROQ_API_KEY repository secret; the job is skipped
-# (not failed) when the secret is absent.
+name: Deterministic RAG quality gate
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  pull_request:
+    paths:
+      - "app/**"
+      - "data/**"
+      - "eval/**"
+      - "tests/test_retrieval*.py"
+      - "requirements*.txt"
+      - ".github/workflows/eval.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "data/**"
+      - "eval/**"
+      - "tests/test_retrieval*.py"
+      - "requirements*.txt"
+      - ".github/workflows/eval.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retrieval-eval-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  eval:
-    name: RAGAS faithfulness gate
+  retrieval-quality:
     runs-on: ubuntu-latest
-    if: ${{ secrets.GROQ_API_KEY != '' }}
+    timeout-minutes: 30
     services:
-      db:
+      postgres:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: scheme
@@ -25,37 +41,47 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U scheme"
-          --health-interval 10s
+          --health-cmd "pg_isready -U scheme -d schemegpt"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
     env:
-      DATABASE_URL: postgresql://scheme:scheme@localhost:5432/schemegpt
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      HF_HOME: /tmp/hf
+      DATABASE_URL: postgresql+psycopg://scheme:scheme@localhost:5432/schemegpt
+      GROQ_API_KEY: ""
+      ENABLE_SEMANTIC_CACHE: "false"
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+
       - name: Install CPU-only PyTorch
-        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0
-      - name: Install dependencies (incl. RAGAS)
-        run: pip install -r requirements-eval.txt
-      - name: Cache embedding model
-        uses: actions/cache@v4
-        with:
-          path: /tmp/hf
-          key: e5-small-${{ runner.os }}
-      - name: Re-embed corpus into pgvector
-        run: python scripts/reembed.py --yes
-      - name: Run evaluation with regression gate
-        run: python -m eval.run_eval --gate
-      - name: Upload eval report
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+
+      - name: Install production and test dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Validate evaluation labels and gate logic
+        run: python -m pytest tests/test_eval_gate.py tests/test_retrieval_gate.py tests/test_quotes.py -q
+
+      - name: Validate source corpus
+        run: python scripts/validate_data.py
+
+      - name: Ingest corpus into pgvector
+        run: python -c "from app.ingest import ingest; print(f'ingested_chunks={ingest()}')"
+
+      - name: Evaluate production hybrid retrieval
+        run: python -m eval.retrieval_gate
+
+      - name: Upload machine-readable results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-report
-          path: |
-            eval/results/report.md
-            eval/results/scores.json
+          name: retrieval-quality-${{ github.sha }}
+          path: eval/results/retrieval_scores.json
+          if-no-files-found: error
+          retention-days: 30

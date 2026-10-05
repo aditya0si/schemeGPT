@@ -14,13 +14,19 @@ export async function POST(req: Request) {
     });
   } catch {
     return new Response(
-      JSON.stringify({ error: "The SchemeGPT API is unreachable." }),
+      JSON.stringify({
+        error:
+          "The SchemeGPT API is unreachable. If the backend is on a free tier, it may be waking up from sleep — please retry in 30 seconds.",
+      }),
       { status: 502, headers: { "content-type": "application/json" } },
     );
   }
   if (!upstream.ok || !upstream.body) {
     return new Response(
-      JSON.stringify({ error: "The SchemeGPT API rejected the request." }),
+      JSON.stringify({
+        error:
+          "The SchemeGPT API rejected the request. Please verify the question or retry shortly.",
+      }),
       { status: upstream.status ?? 502, headers: { "content-type": "application/json" } },
     );
   }

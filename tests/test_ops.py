@@ -409,6 +409,26 @@ def test_llm_client_bounds_the_provider_call(monkeypatch):
     assert settings.groq_max_retries <= 1
 
 
+def test_provider_override_applies_to_the_next_llm_client(tmp_path, clock, monkeypatch):
+    """There is no cached chain/client: the override must bind on the next call.
+
+    ``build_answer_chain`` constructs a fresh LLM client per request, so a
+    POST /ops/provider override reaches the very next request without a restart
+    and without any invalidation hook (there is no chain cache to reset).
+    """
+    from app import rag
+    from app.config import settings
+
+    controller = OpsController(state_path=tmp_path / "ops.json", clock=clock)
+    monkeypatch.setattr(rag, "operator", controller)
+    monkeypatch.setattr(settings, "groq_api_key", "test-key-not-used")
+
+    assert "127.0.0.1:9099" not in (rag.get_llm().groq_api_base or "")
+    controller.set_provider_base_url("http://127.0.0.1:9099/v1")
+    llm = rag.get_llm()
+    assert "127.0.0.1:9099/v1" in (llm.groq_api_base or "")
+
+
 # --- operator state vs the semantic cache -------------------------------------
 # The two refusal reasons deliberately differ. A human stopping generation must
 # stop *serving* generated text, so a cached live answer is not replayed; a

@@ -9,7 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # rest of the API dependencies; see requirements-api.txt. Local dev on
 # Windows/Python 3.12 keeps using requirements.txt unchanged.
 COPY requirements-api.txt requirements.txt ./
-RUN pip install --no-cache-dir -r requirements-api.txt
+RUN pip install --no-cache-dir \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch==2.14.0 && \
+    pip install --no-cache-dir -r requirements-api.txt
 
 # Bake the default embedding model into the image so container starts are
 # fast and do not depend on Hugging Face availability at runtime. Must match

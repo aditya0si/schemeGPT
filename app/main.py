@@ -10,10 +10,16 @@ from sqlalchemy import text
 from app import catalog, ingest, profiles, recommend
 from app import feedback as feedback_store
 from app.config import settings
-from app.db import COLLECTION_NAME, get_engine
+from app.db import (
+    VECTOR_GENERATION_COLUMN,
+    VECTOR_TABLE,
+    get_engine,
+    stored_corpus_chunk_count,
+    stored_corpus_generation,
+    stored_embedding_model,
+)
 from app.ops import ops as operator
 from app.rag import answer
-from app.rag import reset_chains as reset_rag_chains
 from app.ratelimit import RateLimitMiddleware
 from app.stream import stream_answer
 from app.tracing import setup_tracing
@@ -55,18 +61,26 @@ def _require_admin(x_admin_token: str) -> None:
 def count_vectors() -> int:
     with get_engine().connect() as conn:
         table_exists = conn.execute(
-            text("SELECT to_regclass('public.langchain_pg_collection')")
+            text("SELECT to_regclass(:table_name)"),
+            {"table_name": f"public.{VECTOR_TABLE}"},
         ).scalar()
         if table_exists is None:
             return 0
         return int(
+            conn.execute(text(f"SELECT count(*) FROM {VECTOR_TABLE}")).scalar()
+        )
+
+
+def count_generation_vectors(generation: str) -> int:
+    """Rows belonging to one atomically activated corpus generation."""
+    with get_engine().connect() as conn:
+        return int(
             conn.execute(
                 text(
-                    "SELECT count(*) FROM langchain_pg_embedding e "
-                    "JOIN langchain_pg_collection c ON e.collection_id = c.uuid "
-                    "WHERE c.name = :name"
+                    f"SELECT count(*) FROM {VECTOR_TABLE} "
+                    f"WHERE {VECTOR_GENERATION_COLUMN} = :generation"
                 ),
-                {"name": COLLECTION_NAME},
+                {"generation": generation},
             ).scalar()
         )
 
@@ -75,27 +89,23 @@ def count_vectors() -> int:
 async def lifespan(app: FastAPI):
     # Idempotent on every startup: CREATE TABLE IF NOT EXISTS + empty-check.
     profiles.init_table()
-    if count_vectors() == 0:
-        ingest.ingest()
+    vectors = count_vectors()
+    if vectors == 0:
+        if settings.enable_auto_ingest:
+            ingest.ingest()
     else:
-        # Vectors exist: verify they were embedded by the CONFIGURED model.
-        # Vectors from a different model are silently wrong (incomparable
-        # spaces); warn loudly instead of auto-deleting anything.
-        from app.db import stored_embedding_model
-
+        # Vectors exist: readiness rejects model or generation drift rather
+        # than silently comparing embeddings from incompatible spaces.
         recorded = stored_embedding_model()
         if recorded is not None and recorded != settings.embedding_model:
             logging.getLogger(__name__).warning(
-                "Vector store was embedded with '%s' but the API is configured "
-                "for '%s'. Retrieval quality is degraded until the corpus is "
-                "re-embedded. Run: python scripts/reembed.py --yes",
-                recorded,
-                settings.embedding_model,
+                "Vector store embedding model does not match configuration. "
+                "Run: python scripts/reembed.py"
             )
-    # Full-text search index for hybrid retrieval (idempotent, non-fatal).
-    from app.db import ensure_fts_index
+    if vectors > 0 or settings.enable_auto_ingest:
+        from app.db import ensure_fts_index
 
-    ensure_fts_index()
+        ensure_fts_index()
     yield
 
 
@@ -115,6 +125,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RateLimitMiddleware)
+
+
+@app.get("/livez", include_in_schema=False)
+def livez():
+    """Process liveness probe: intentionally performs no dependency I/O."""
+    return {"status": "alive"}
+
+
+@app.get("/readyz")
+def readyz():
+    """Dependency readiness for safe traffic routing and post-deploy checks."""
+    checks: dict[str, object] = {"database": "ok"}
+    try:
+        vectors = count_vectors()
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Readiness database check failed (%s).", type(exc).__name__
+        )
+        checks["database"] = "unavailable"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        ) from None
+
+    checks["vectors"] = vectors
+    if vectors < 1:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    recorded_model = stored_embedding_model()
+    if recorded_model != settings.embedding_model:
+        checks["embedding_model"] = "mismatch"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    checks["embedding_model"] = "ok"
+    try:
+        generation = stored_corpus_generation()
+        expected_count = stored_corpus_chunk_count()
+        generation_count = (
+            count_generation_vectors(generation) if generation else 0
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Readiness generation check failed (%s).", type(exc).__name__
+        )
+        checks["database"] = "unavailable"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        ) from None
+    if (
+        not generation
+        or expected_count != vectors
+        or generation_count != vectors
+    ):
+        checks["corpus_generation"] = "incomplete"
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "not_ready", "checks": checks},
+        )
+
+    checks["corpus_generation"] = "ok"
+    return {
+        "status": "ready",
+        "mode": "live" if settings.groq_api_key.strip() else "demo",
+        "checks": checks,
+    }
 
 
 @app.get("/health")
@@ -139,7 +221,16 @@ def health():
 
 @app.post("/ingest")
 def ingest_docs(x_admin_token: str = Header(default="")):
-    """Re-ingest Markdown sources into the vector store (admin only)."""
+    """Re-ingest Markdown sources into the vector store (admin only).
+
+    Protected by the ``X-Admin-Token`` header, compared in constant time with
+    the configured ``ADMIN_TOKEN``. When no ``ADMIN_TOKEN`` is configured the
+    endpoint is disabled with a clear 503 response: manual re-ingestion must
+    not be exposed publicly. Startup auto-ingestion is controlled by
+    ``ENABLE_AUTO_INGEST`` and runs
+    (idempotently) when enabled and the vector store is empty. Tokens are
+    never logged.
+    """
     _require_admin(x_admin_token)
     return {"chunks": ingest.ingest()}
 
@@ -362,8 +453,9 @@ def ops_set_provider(
     except ValueError as exc:
         # Safe by construction: the validator never echoes the URL back.
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    # The cached retrieval chain holds an LLM client bound to the old endpoint.
-    reset_rag_chains()
+    # No chain/client cache to invalidate: ``build_answer_chain`` constructs a
+    # fresh LLM client from the current override on every request, so the new
+    # endpoint takes effect on the next request without a restart.
     return state
 
 

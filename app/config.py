@@ -7,7 +7,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 
 class Settings(BaseSettings):
     groq_api_key: str = ""
-    database_url: str = "postgresql+psycopg2://scheme:scheme@localhost:5432/schemegpt"
+    database_url: str = "postgresql+psycopg://scheme:scheme@localhost:5432/schemegpt"
     embedding_model: str = "intfloat/multilingual-e5-small"
     groq_model: str = "openai/gpt-oss-120b"
     # Small, fast model for cheap sub-tasks (normalization, routing).
@@ -26,14 +26,17 @@ class Settings(BaseSettings):
     # OpenTelemetry OTLP endpoint (e.g. http://localhost:4318). Leave blank to
     # disable tracing entirely (zero overhead no-op spans).
     otel_exporter_otlp_endpoint: str = ""
-    # Judge model for the RAGAS eval harness. Defaults to the answer model;
+    # Judge model for the optional live generation evaluation.
     # override (e.g. the smaller fast model) to fit an eval run inside a
     # separate per-model daily-token bucket on the free tier.
     eval_judge_model: str = ""
     data_dir: str = "data/schemes"
+    # Populate an empty vector store during startup. Disable this for the
+    # model-free demo image, which serves labelled fallback answers and must
+    # not load the embedding model on a 512 MB instance.
+    enable_auto_ingest: bool = True
     # Admin token required for POST /ingest via the X-Admin-Token header.
-    # Leave blank to disable manual re-ingestion (startup auto-ingestion is
-    # unchanged and still runs when the vector store is empty).
+    # Leave blank to disable manual re-ingestion.
     admin_token: str = ""
     # Comma-separated list of browser origins allowed by CORS. The Streamlit
     # web UI talks to the API server-side (no browser CORS), so only origins

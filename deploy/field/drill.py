@@ -592,7 +592,7 @@ def phase_broken_release(report: dict) -> None:
     # which tests the wrong thing and quietly leaves the deployment broken.
     patch_file = FIELD_DIR / "state" / "broken-release.env"
     patch_file.write_text(
-        "DATABASE_URL=postgresql+psycopg2://scheme:scheme@db-does-not-exist:5432/schemegpt\n",
+        "DATABASE_URL=postgresql+psycopg://scheme:scheme@db-does-not-exist:5432/schemegpt\n",
         encoding="utf-8",
     )
     log("Release config patch prepared: unreachable DATABASE_URL (host db-does-not-exist)")
