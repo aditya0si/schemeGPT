@@ -10,14 +10,19 @@ import time
 from collections import deque
 from typing import Any
 
+from app import pricing
+
 _lock = threading.Lock()
 _counters: dict[str, int] = {}
 _latencies: deque = deque(maxlen=500)
 _token_usage: dict[str, dict[str, int]] = {}
+_cost_by_model: dict[str, float] = {}
+_cost_unpriced_calls = 0
 
 
 def observe_tokens(model: str, prompt: int, completion: int) -> None:
     """Accumulate LLM token usage per model (from response usage metadata)."""
+    global _cost_unpriced_calls
     with _lock:
         bucket = _token_usage.setdefault(
             model, {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}
@@ -25,6 +30,11 @@ def observe_tokens(model: str, prompt: int, completion: int) -> None:
         bucket["prompt_tokens"] += prompt
         bucket["completion_tokens"] += completion
         bucket["calls"] += 1
+        cost = pricing.cost_for(model, prompt, completion)
+        if cost is None:
+            _cost_unpriced_calls += 1
+        else:
+            _cost_by_model[model] = _cost_by_model.get(model, 0.0) + cost
 
 
 def inc(name: str, delta: int = 1) -> None:
@@ -70,4 +80,14 @@ def snapshot() -> dict[str, Any]:
         snapshot_out["tokens"] = {
             model: dict(bucket) for model, bucket in _token_usage.items()
         }
+        cost_by_model = dict(_cost_by_model)
+        unpriced_calls = _cost_unpriced_calls
+        all_calls = sum(bucket["calls"] for bucket in _token_usage.values())
+    total_cost = float(sum(cost_by_model.values()))
+    snapshot_out["cost"] = {
+        "total": total_cost,
+        "by_model": cost_by_model,
+        "per_request_avg": (total_cost / all_calls) if all_calls else None,
+        "unpriced_calls": unpriced_calls,
+    }
     return snapshot_out

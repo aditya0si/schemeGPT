@@ -90,7 +90,7 @@ Notes:
 ```bash
 curl https://<api>.fly.dev/livez          # {"status":"alive"}
 curl https://<api>.fly.dev/readyz          # dependency readiness + live/demo mode
-curl https://<api>.fly.dev/metrics         # counters, cache hit rate, tokens
+curl https://<api>.fly.dev/metrics         # counters, cache hit rate, tokens, USD cost
 curl -X POST https://<api>.fly.dev/query \
   -H "Content-Type: application/json" \
   -d '{"question":"How much income support does PM-KISAN provide?"}'

@@ -179,7 +179,7 @@ quality remains a tracked metric, not a solved problem: the two remaining
 misses are the PM-SYM Hinglish question and the unorganised-worker profile
 question, which have no lexical anchor.
 
-<!-- claims: tests=242 evidence=17 -->
+<!-- claims: tests=256 evidence=17 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
@@ -190,12 +190,21 @@ scored with zero pipeline/evaluation errors before aggregate floors can pass.
 The manual `Live generation quality experiment` workflow uploads the report, scores, and run
 history; no generation baseline will be published until a full set completes.
 
-**Cost engineering:** per-model token usage is tracked on `/metrics`
-(reference list-price mapping in `app/rag.py`), the semantic cache serves
-paraphrased repeats without an LLM call (hit rate on `/metrics`), invalidates
-entries when the verifier contract, embedding model, answer model, answer-prompt
-version, or corpus generation changes, and re-verifies quote flags on every hit. The per-IP token bucket (`RATE_LIMIT_RPM`, default 20/min) keeps a public
-deployment inside the shared free-tier quota.
+**Cost engineering:** every LLM call is also a money event. Per-model token
+usage is tracked on `/metrics` alongside a USD **cost ledger** (`cost.total`,
+`cost.by_model`, `cost.per_request_avg`, `cost.unpriced_calls`) computed from a
+static price table in `app/pricing.py`. Prices are Groq list rates per
+1,000,000 tokens: `openai/gpt-oss-120b` at `$0.15` in / `$0.60` out and
+`openai/gpt-oss-20b` at `$0.075` in / `$0.30` out (verified 2026-10-05;
+provenance is recorded on each entry's `source`). The ledger is honest about its
+limits: Groq's 50% prompt-cache and batch discounts are not modelled, so
+cached or batched calls are over-reported at list price, and a model with no
+price entry is counted in `unpriced_calls` rather than silently costed at zero.
+The semantic cache serves paraphrased repeats without an LLM call (hit rate on
+`/metrics`), invalidates entries when the verifier contract, embedding model,
+answer model, answer-prompt version, or corpus generation changes, and
+re-verifies quote flags on every hit. The per-IP token bucket (`RATE_LIMIT_RPM`,
+default 20/min) keeps a public deployment inside the shared free-tier quota.
 
 ---
 
@@ -328,7 +337,7 @@ SchemeGPT/
 | `POST /ops/ai` | `POST` | Operator kill switch: stop LLM generation for this instance and serve retrieval-only answers; the decision persists across restarts. | Header: `X-Admin-Token` |
 | `POST /ops/provider` | `POST` | Repoint generation at another endpoint (customer API gateway, egress proxy, secondary provider) at runtime. | Header: `X-Admin-Token` |
 | `GET /ops/audit` | `GET` | Bounded, sanitized operator audit trail (who disabled generation, when, why). | Header: `X-Admin-Token` |
-| `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage. | None |
+| `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage, and the USD cost ledger. | None |
 | `POST /feedback` | `POST` | Thumbs-up/down rating on one answer; curated ratings grow the eval set (`scripts/feedback_to_eval.py`). | None |
 
 ---
