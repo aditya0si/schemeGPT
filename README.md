@@ -179,7 +179,7 @@ quality remains a tracked metric, not a solved problem: the two remaining
 misses are the PM-SYM Hinglish question and the unorganised-worker profile
 question, which have no lexical anchor.
 
-<!-- claims: tests=256 evidence=17 -->
+<!-- claims: tests=267 evidence=18 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
@@ -188,7 +188,11 @@ had only 5–18 scores out of 20), so it is not presented as a valid baseline.
 `python -m eval.run_eval --gate` now requires every selected row to be completely
 scored with zero pipeline/evaluation errors before aggregate floors can pass.
 The manual `Live generation quality experiment` workflow uploads the report, scores, and run
-history; no generation baseline will be published until a full set completes.
+history; no generation baseline will be published until a full set completes. An
+offline regression baseline over the archived 2026-09-01 live-run capture —
+verifying that quoted text is an exact substring of the retrieved sources with
+no key, database, or network — is recorded in
+[`docs/evidence/OFFLINE-GENERATION.md`](docs/evidence/OFFLINE-GENERATION.md).
 
 **Cost engineering:** every LLM call is also a money event. Per-model token
 usage is tracked on `/metrics` alongside a USD **cost ledger** (`cost.total`,
