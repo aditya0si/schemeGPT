@@ -33,6 +33,22 @@ Two consequences are load-bearing and tested explicitly:
   ``(?!\\d)`` (on the digit-normalised text), so a 12-digit Aadhaar embedded in
   a longer digit run is *not* a standalone Aadhaar and is not reported.
 
+Case handling
+-------------
+This layer exists to stop identifiers *leaving* the box, so a missing match is
+an egress leak, not a cosmetic miss. PAN, GSTIN, and IFSC are conventionally
+written in uppercase, but a citizen may type them in lowercase; matching them
+case-sensitively would let `mljmi4203y` through unredacted. Those three
+recognizers therefore match case-insensitively (``re.IGNORECASE``) and report
+the **original** span text -- the character slice exactly as the user typed it,
+never a normalised (uppercased) form -- so a redaction replaces precisely the
+characters that were matched. UPI is already case-insensitive by construction
+(its local part and handle both accept either case); Aadhaar, mobile, and the
+Devanagari-digit run are numeric and have no case. Case-insensitivity is a
+character-class widening only: it cannot manufacture five consecutive letters
+where none exist, so it does not fire on near-misses such as an alternating
+letter/digit high-entropy token.
+
 Devanagari digits
 -----------------
 Indian identifiers are frequently written in Devanagari numerals
@@ -87,13 +103,18 @@ _AADHAAR_RE = re.compile(
 
 # PAN is deliberately *not* boundary-anchored against digits, so the inner PAN
 # of a GSTIN is produced as a candidate and the overlap rule removes it.
-_PAN_RE = re.compile(r"(?<![A-Z])[A-Z]{5}[0-9]{4}[A-Z](?![A-Z])")
+# IGNORECASE: a citizen may type a PAN in lowercase; matching it exactly as typed
+# and reporting the original span is what makes the redaction complete.
+_PAN_RE = re.compile(r"(?<![A-Z])[A-Z]{5}[0-9]{4}[A-Z](?![A-Z])", re.IGNORECASE)
 
 _GSTIN_RE = re.compile(
-    r"(?<![0-9A-Z])[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}(?![0-9A-Z])"
+    r"(?<![0-9A-Z])[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}(?![0-9A-Z])",
+    re.IGNORECASE,
 )
 
-_IFSC_RE = re.compile(r"(?<![0-9A-Z])[A-Z]{4}0[A-Z0-9]{6}(?![0-9A-Z])")
+_IFSC_RE = re.compile(
+    r"(?<![0-9A-Z])[A-Z]{4}0[A-Z0-9]{6}(?![0-9A-Z])", re.IGNORECASE
+)
 
 # local@handle. The local part may contain . _ -; the handle is letters/digits
 # with no dot, and the trailing lookahead rejects a dotted domain so an email
@@ -222,7 +243,11 @@ def recognize_aadhaar(text: str) -> list[Match]:
 
 
 def recognize_pan(text: str) -> list[Match]:
-    """PAN in ``[A-Z]{5}[0-9]{4}[A-Z]`` form (may fire inside a GSTIN)."""
+    """PAN in ``[A-Z]{5}[0-9]{4}[A-Z]`` form, case-insensitively.
+
+    May fire inside a GSTIN (the overlap rule keeps the enclosing GSTIN). The
+    reported ``text`` is the original slice, preserving the user's casing.
+    """
     return [
         Match(m.start(), m.end(), KIND_PAN, m.group(0))
         for m in _PAN_RE.finditer(text)
@@ -230,7 +255,7 @@ def recognize_pan(text: str) -> list[Match]:
 
 
 def recognize_gstin(text: str) -> list[Match]:
-    """15-character GSTIN numbers."""
+    """15-character GSTIN numbers, case-insensitively, original span."""
     return [
         Match(m.start(), m.end(), KIND_GSTIN, m.group(0))
         for m in _GSTIN_RE.finditer(text)
@@ -238,7 +263,7 @@ def recognize_gstin(text: str) -> list[Match]:
 
 
 def recognize_ifsc(text: str) -> list[Match]:
-    """IFSC bank/branch codes in ``[A-Z]{4}0[A-Z0-9]{6}`` form."""
+    """IFSC codes in ``[A-Z]{4}0[A-Z0-9]{6}`` form, case-insensitively."""
     return [
         Match(m.start(), m.end(), KIND_IFSC, m.group(0))
         for m in _IFSC_RE.finditer(text)

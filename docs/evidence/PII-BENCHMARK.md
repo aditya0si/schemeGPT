@@ -47,6 +47,28 @@ Micro aggregates every true positive, label and prediction. Macro is the
 unweighted mean of the per-kind rates. Eight negative records carried no labels
 and **none** produced a match.
 
+### Case handling (re-measured 2026-10-05)
+
+PAN, GSTIN, and IFSC now match case-insensitively; UPI already did (its local
+part and handle accept either case), and the numeric kinds -- Aadhaar, mobile,
+and the Devanagari-digit run -- have no case. The change is an egress fix, not a
+cosmetic one: a citizen who types a PAN in lowercase (`mljmi4203y`) must still
+have it redacted, because an unrecognised identifier is an identifier that
+leaves the box. The reported span is always the **original** text the user
+typed, never an uppercased normalisation, so redaction replaces exactly the
+matched characters. No identifier kind is left case-sensitive.
+
+Re-measurement after the change, over the same committed corpus, is **unchanged
+in every cell above**: the corpus is generated in uppercase, so the case
+decision moves no published number. The decision is recorded here because a
+number that does *not* move under a matching change is itself worth stating.
+Case-insensitive matching only widens character classes; it cannot manufacture
+five consecutive letters where none exist, so the near-miss negatives
+(`neg-high-entropy`, `neg-pan-malformed`, the non-mobile prefixes) are
+unaffected. The behaviour is pinned in `tests/test_guardrails_recognizers.py`:
+lowercase PAN/GSTIN/IFSC match and report the original span, and a lowercase
+alternating high-entropy token does not fire.
+
 ## Corpus provenance
 
 | Field | Value |
@@ -136,9 +158,12 @@ Additional explicit limits:
   statistical sample of Indian text.
 - It covers seven identifier kinds only. Addresses, names, dates of birth, and
   other quasi-identifiers are out of scope.
-- This phase (6a) is detection only. Nothing here is wired into the request
-  path; the reversible vault, the FastAPI middleware, and streaming overlap
-  buffering are Phase 6b.
+- PAN, GSTIN, IFSC, and UPI match case-insensitively (see "Case handling"); the
+  numeric kinds have no case. Nothing is left case-sensitive on purpose, so there
+  is no deliberate case gap to state.
+- This phase (6a) is detection only. Nothing here is a request-path result; the
+  reversible vault, the FastAPI integration, and streaming overlap buffering are
+  Phase 6b/6c.
 
 ## How to reproduce
 

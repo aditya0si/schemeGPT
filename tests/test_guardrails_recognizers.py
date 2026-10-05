@@ -118,7 +118,16 @@ def test_pan_matches_standalone():
 def test_pan_rejects_malformed():
     assert recognize_pan(MALFORMED_PAN) == []
     assert recognize_pan("ABCDE12345") == []  # final char must be a letter
-    assert recognize_pan("abcde1234f") == []  # uppercase only
+
+
+def test_pan_matches_lowercase_and_reports_original_span():
+    # Case-insensitivity is a leak fix: a lowercase PAN must not egress
+    # unredacted, and the reported span keeps the characters the user typed.
+    text = "pan abcde1234f on file"
+    matches = recognize_pan(text)
+    assert [m.text for m in matches] == ["abcde1234f"]
+    assert matches[0].start == 4
+    assert text[matches[0].start : matches[0].end] == "abcde1234f"
 
 
 # --- GSTIN ------------------------------------------------------------------
@@ -128,9 +137,15 @@ def test_gstin_matches_fifteen_characters():
     assert [m.text for m in recognize_gstin(f"GSTIN {VALID_GSTIN}.")] == [VALID_GSTIN]
 
 
-def test_gstin_rejects_short_or_lowercase():
+def test_gstin_rejects_short():
     assert recognize_gstin("27ABCDE1234F1Z") == []
-    assert recognize_gstin("27abcde1234f1z5") == []
+
+
+def test_gstin_matches_lowercase_and_reports_original_span():
+    text = "gstin 27abcde1234f1z5 on file"
+    matches = recognize_gstin(text)
+    assert [m.text for m in matches] == ["27abcde1234f1z5"]
+    assert text[matches[0].start : matches[0].end] == "27abcde1234f1z5"
 
 
 def test_gstin_contains_pan_and_overlap_rule_reports_gstin_only():
@@ -149,6 +164,13 @@ def test_gstin_contains_pan_and_overlap_rule_reports_gstin_only():
 def test_ifsc_matches_and_rejects_bad_fifth_character():
     assert [m.text for m in recognize_ifsc(f"IFSC {VALID_IFSC}.")] == [VALID_IFSC]
     assert recognize_ifsc("HDFC1001234") == []  # 5th char must be 0
+
+
+def test_ifsc_matches_lowercase_and_reports_original_span():
+    text = "ifsc hdfc0001234 branch"
+    matches = recognize_ifsc(text)
+    assert [m.text for m in matches] == ["hdfc0001234"]
+    assert text[matches[0].start : matches[0].end] == "hdfc0001234"
 
 
 # --- UPI --------------------------------------------------------------------
@@ -249,6 +271,22 @@ def test_find_all_returns_sorted_non_overlapping_matches():
 
 def test_find_all_reports_nothing_for_clean_text():
     assert find_all("The scheme covers eligible farmer families.") == []
+
+
+def test_case_insensitive_matching_does_not_fire_on_high_entropy():
+    # Widening to lowercase must not manufacture a match: an alternating
+    # letter/digit token never contains the five consecutive letters that a
+    # PAN, GSTIN, or IFSC needs, in either case.
+    for token in ("A1B2C3D4E5F6G", "a1b2c3d4e5f6g"):
+        assert find_all(f"Session token {token} was generated.") == []
+
+
+def test_lowercase_gstin_overlap_still_reports_gstin_then_standalone_pan():
+    text = "gstin 27abcde1234f1z5 and pan zyxwv9876u"
+    matches = find_all(text)
+    assert [m.kind for m in matches] == [KIND_GSTIN, KIND_PAN]
+    assert matches[0].text == "27abcde1234f1z5"
+    assert matches[1].text == "zyxwv9876u"
 
 
 def test_recognizers_import_without_database_or_network():
