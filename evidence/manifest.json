@@ -12,6 +12,7 @@
   "deploy/field/reports/preflight-airgap-20260919T223556Z.json": "e0221fe4bd6a2a85",
   "deploy/field/reports/preflight-workstation.json": "e815ac32e976903e",
   "docs/evidence/FIELD-DRILL.md": "9794d2c4aec72d21",
+  "docs/evidence/OFFLINE-GENERATION.md": "f30d25a9d8c74578",
   "docs/evidence/RETRIEVAL-GATE.md": "7211510eb3daacb9",
   "eval/results/report.md": "d64b9e917638f077",
   "loadtest/RESULTS.md": "c039f987ce04fab9",
