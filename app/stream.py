@@ -41,7 +41,7 @@ from app.rag import (
     TokenUsageHandler,
 )
 from app.config import settings
-from app.quotes import parse_quotes, verify_quotes
+from app.quotes import validate_quotes
 from app.schemas import ProfileData
 from app.tracing import stage_span
 
@@ -86,7 +86,7 @@ async def _stream_fallback(payload: dict, lang: str) -> AsyncIterator[str]:
     yield _sse("sources", sources)
     for word in answer_text.split(" "):
         yield _sse("token", {"text": word + " "})
-    quoted = verify_quotes(parse_quotes(answer_text), sources)
+    quoted = validate_quotes(answer_text, sources)
     if quoted:
         yield _sse("quotes", [q.__dict__ for q in quoted])
     mode = payload.get("mode", "demo")
@@ -223,9 +223,7 @@ async def _stream_answer_core(
                 answer_parts.append(text)
                 yield _sse("token", {"text": text})
         with stage_span("verify_quotes"):
-            verified = verify_quotes(
-                parse_quotes("".join(answer_parts)), source_payload
-            )
+            verified = validate_quotes("".join(answer_parts), source_payload)
         if verified:
             yield _sse("quotes", [q.__dict__ for q in verified])
         usage.record(settings.groq_model)

@@ -28,7 +28,7 @@ from app.catalog import load_scheme_catalog_records
 from app.config import ROOT_DIR, settings
 from app.db import get_retriever as get_hybrid_retriever
 from app.ops import ops as operator
-from app.quotes import parse_quotes, verify_quotes
+from app.quotes import validate_quotes
 from app.schemas import ProfileData
 from app.tracing import stage_span
 
@@ -945,7 +945,7 @@ def answer(
         }
         for doc in docs
     ]
-    verified_quotes = verify_quotes(parse_quotes(answer_text), sources)
+    verified_quotes = validate_quotes(answer_text, sources)
     payload = {
         "answer": answer_text,
         "sources": sources,
