@@ -30,22 +30,25 @@ stdlib + this repository only, so it imports under SchemeGPT's environment and
 its wiring is unit-tested there against signature-faithful stubs
 (``tests/test_samjho_gate_driver.py``).
 
-Execution (the orchestrator runs this, not the author)
-------------------------------------------------------
-Run from samjho's checkout root so ``evals`` / ``api`` resolve and any
-``evals/golden/*.jsonl`` relative paths resolve, with SchemeGPT on
-``PYTHONPATH`` so ``clients`` / ``app`` resolve too. ``DATABASE_URL`` is the
-only required override -- samjho's ``api/config.py`` defaults to port 5432
-while the measured corpus lives on 5439::
+Execution (the orchestrator ran this, not the author)
+-----------------------------------------------------
+The recorded run used this repository's root as the working directory, with
+samjho on ``PYTHONPATH`` so ``clients`` / ``app`` resolve from SchemeGPT while
+``evals`` / ``api`` resolve from samjho, and samjho's own virtualenv::
 
-    cd C:/Users/oliad/Desktop/samjho
-    PYTHONPATH="C:/Users/oliad/Desktop/SchemeGPT;C:/Users/oliad/Desktop/samjho" \\
-        DATABASE_URL="postgresql://samjho:samjho@localhost:5439/samjho" \\
-        .venv/Scripts/python.exe \\
-        C:/Users/oliad/Desktop/SchemeGPT/clients/samjho/run_gate_through_spine.py
+    cd C:/Users/oliad/Desktop/SchemeGPT
+    PYTHONPATH='C:/Users/oliad/Desktop/samjho' \\
+        DATABASE_URL='postgresql://samjho:<redacted>@localhost:5439/samjho' \\
+        /c/Users/oliad/Desktop/samjho/.venv/Scripts/python.exe \\
+        -m clients.samjho.run_gate_through_spine
 
-(On Windows the ``PYTHONPATH`` separator is ``;``. If samjho is invoked through
-``uv``, substitute ``uv run python`` for the venv interpreter.)
+``DATABASE_URL`` is the only required override -- samjho's ``api/config.py``
+defaults to port 5432 while the measured corpus lives on 5439. The result is
+recorded in ``docs/evidence/SPINE-SECOND-CLIENT.md``.
+
+(On Windows the ``PYTHONPATH`` separator is ``;`` when more than one entry is
+needed. If samjho is invoked through ``uv``, substitute ``uv run python`` for
+the venv interpreter.)
 
 Exit codes: ``0`` only when samjho's gate passes; ``1`` when samjho's gate
 fails; ``2`` when the run could not be performed at all (imports, the callables,

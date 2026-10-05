@@ -85,45 +85,110 @@ reinterprets a score — it only supplies the client responses through the spine
 and forwards samjho's gate exit code (`0` pass, `1` fail, `2` cannot run). The
 metric table it prints is samjho's own.
 
-The exact orchestration command (run from samjho's checkout root, inside
-samjho's venv, with SchemeGPT on `PYTHONPATH`):
+The run was launched by the orchestrator from this repository, with samjho on
+`PYTHONPATH` so `clients` / `app` resolve from SchemeGPT while `evals` / `api`
+resolve from samjho, using samjho's own virtualenv and its live database on port
+5439:
 
 ```bash
-cd C:/Users/oliad/Desktop/samjho
-PYTHONPATH="C:/Users/oliad/Desktop/SchemeGPT;C:/Users/oliad/Desktop/samjho" \
-    DATABASE_URL="postgresql://samjho:samjho@localhost:5439/samjho" \
-    .venv/Scripts/python.exe \
-    C:/Users/oliad/Desktop/SchemeGPT/clients/samjho/run_gate_through_spine.py
+cd C:/Users/oliad/Desktop/SchemeGPT
+PYTHONPATH='C:/Users/oliad/Desktop/samjho' \
+    DATABASE_URL='postgresql://samjho:<redacted>@localhost:5439/samjho' \
+    /c/Users/oliad/Desktop/samjho/.venv/Scripts/python.exe \
+    -m clients.samjho.run_gate_through_spine
 ```
 
-`DATABASE_URL` is the only required override: `api/config.py` defaults to port
-5432 while the measured corpus lives on 5439. The orchestrator should compare
-the printed table against the **without-spine baseline** measured on the same
-1,004-chunk corpus: `hit@4 1.000`, `MRR 0.869`, `page@4 1.000`, `citation hit
-0.914`, `golden acceptance 0.971`, `refusal accuracy 0.800` → `GATE PASSED`.
+`DATABASE_URL` is the only required override: samjho's `api/config.py` defaults
+to port 5432 while the measured corpus lives on 5439. The recorded result is in
+the next section.
 
-## What was NOT executed — the honest limit
+## The live run — samjho's own gate, through the spine
 
-**samjho's own end-to-end gate was not run by the author of these files.** The
-Phase 7c driver above exists to run it, but the author is sandboxed to this
-repository: samjho's source, venv and database are outside the workspace
-boundary, so the driver was only unit-tested against signature-faithful stubs.
-**No gate result is claimed here.** The driver is the deliverable; the run is
-the orchestrator's, and until it executes, the "what have we proven" question
-stays at: the binding maps every concept correctly, but the mapping has not met
-samjho's live 1,004-chunk corpus through the spine.
+The orchestrator executed the Phase 7c driver above against samjho's live
+database (port 5439, the 1,004-chunk corpus: 593 science + 411 maths). It ran
+**samjho's own gate** through the spine binding. The verbatim output was:
 
-The run is now *possible* outside this repository (the orchestrator reports an
-up pgvector instance on port 5439 with the corpus loaded), but it still needs a
-samjho checkout with `api/`, `evals/` and `data/`, and it must be launched from
-that checkout with `DATABASE_URL` pointed at 5439 (the command is in the Phase
-7c section above). `api/config.py` historically defaulted `DATABASE_URL` to
-`postgresql://samjho:samjho@localhost:5432/samjho`, which is why the override is
-required.
+```text
+[spine] routed evals.adapter.search / evals.adapter.answer through clients.samjho.binding; metrics below are samjho's own
 
-Also **not** executed by the author: samjho's written path against a real
-provider (the wiring tests name a stub provider). Nothing about the live
-provider path is asserted here.
+samjho eval gate
+  retriever : api.retriever.search(subject: 'str', question: 'str', chapter_no: 'int | None' = None, top_k: 'int | None' = None) -> 'list[RetrievedChunk]'
+  answer    : api.answer.answer_question(subject: 'str', question: 'str', chapter_no: 'int | None' = None, top_k: 'int | None' = None) -> 'AnswerResult'
+  provider  : retrieval-only
+  scope     : chapter   top_k: 6   hit@4 measured on the first 4 of the returned list
+
+subject      n   hit@1   hit@4     MRR  page@4  pgstart  cite_hit  accepted
+---------------------------------------------------------------------------
+science     20   0.700   1.000   0.833   1.000    0.900     0.900     1.000
+maths       15   0.867   1.000   0.917   1.000    0.400     0.933     0.933
+ALL         35   0.771   1.000   0.869   1.000    0.686     0.914     0.971
+
+refusals: 15 questions x 2 scope(s) ['science', 'maths'] — judged 15, refused everywhere it could answer: 0.800
+          refused with subject=science : 0.933
+          refused with subject=maths   : 0.867
+          not_course_material : 1.000
+          other_board         : 0.500
+          out_of_syllabus     : 0.833
+
+metric                measured   threshold   result
+------------------------------------------------------
+section hit@4            1.000       0.900   PASS
+MRR                      0.869       0.750   PASS
+page@4                   1.000       0.900   PASS
+citation hit             0.914       0.800   PASS
+golden acceptance        0.971       0.900   PASS
+refusal accuracy         0.800       0.800   PASS
+
+GATE PASSED
+[spine] routing trace (diagnostic only; gate metrics are samjho's):
+  subject=maths: searches=15 answers=30 refused=14 degraded=0 paths={'retrieval-only': 16, 'refusal': 14}
+  subject=science: searches=20 answers=35 refused=14 degraded=0 paths={'retrieval-only': 21, 'refusal': 14}
+```
+
+The **without-spine baseline** was measured by the orchestrator on the same
+database and the same 1,004-chunk corpus, calling samjho directly:
+
+| metric | without spine | through spine | threshold | result |
+| --- | --- | --- | --- | --- |
+| section hit@4 | 1.000 | 1.000 | 0.900 | PASS |
+| MRR | 0.869 | 0.869 | 0.750 | PASS |
+| page@4 | 1.000 | 1.000 | 0.900 | PASS |
+| citation hit | 0.914 | 0.914 | 0.800 | PASS |
+| golden acceptance | 0.971 | 0.971 | 0.900 | PASS |
+| refusal accuracy | 0.800 | 0.800 | 0.800 | PASS |
+
+The per-subject rows are identical too: `science` `0.700 / 1.000 / 0.833 /
+1.000 / 0.900 / 0.900 / 1.000` (`hit@1 / hit@4 / MRR / page@4 / pgstart /
+cite_hit / accepted`), `maths` `0.867 / 1.000 / 0.917 / 1.000 / 0.400 / 0.933 /
+0.933`, and `ALL` `0.771 / 1.000 / 0.869 / 1.000 / 0.686 / 0.914 / 0.971`. The
+refusal breakdown is identical (`science` 0.933, `maths` 0.867,
+`not_course_material` 1.000, `other_board` 0.500, `out_of_syllabus` 0.833), and
+the same three "answered instead of refused" examples, with the same
+`below_threshold` reasons, are reported by both runs. Both verdicts are
+`GATE PASSED`.
+
+**Conclusion.** Every gated metric, both per-subject rows, the refusal
+breakdown and the answered-instead-of-refused examples are IDENTICAL between the
+two runs. The Phase 7a extraction is therefore **behaviour-preserving through a
+second, independently built client's own full evaluation** — not just through
+this repository's signature-faithful stubs.
+
+### Footnotes
+
+* **Key sets differ, and the gate does not score them.** The binding's answer
+  payload carries extra source-label keys rather than `AnswerResult`'s exact key
+  set. samjho's gate does not score key sets, so "identical" means identical on
+  everything the gate measures — no more.
+* **No LLM-written path was exercised.** `provider: retrieval-only` means samjho
+  answered extractively in this environment (no LLM key was configured), so no
+  LLM-written answer path was exercised by either run.
+* **This corpus is smaller than samjho's published one.** The measured corpus
+  here is 1,004 chunks (science + maths), smaller than the 1,437-chunk database
+  samjho's own README reports, so samjho's published figures (hit@4 0.943, MRR
+  0.806, refusal 0.867) are **not directly comparable** to these numbers. This
+  run neither reproduces nor contradicts samjho's README.
+* **Refusal accuracy sits exactly on its threshold.** 0.800 against a 0.800
+  floor: it passes, as it did before, but with no margin.
 
 ## Findings
 
@@ -150,6 +215,12 @@ provider path is asserted here.
 5. **`gate` / `router` remain SchemeGPT-only.** samjho has no ingress kill
    switch/breaker and no injectable provider router, confirming the Phase 7a
    claim that these two are documented contracts rather than attached seams.
+6. **The binding is behaviour-preserving end-to-end.** samjho's own gate,
+   executed against its live 1,004-chunk corpus through the spine, produced
+   metrics identical to the same gate called directly — the mapping is not just
+   unit-test-clean, it is score-identical on the client's own evaluation (see
+   "The live run" and its footnotes for what "identical" does and does not
+   cover).
 
 ## Reproduce
 
@@ -160,6 +231,9 @@ provider path is asserted here.
 ./.venv/Scripts/python.exe tools/check_claims.py
 ```
 
-The samjho gate itself is **not** reproducible in this repository's
-environment; see "What was NOT executed". The Phase 7c section names the
-command the orchestrator runs, outside this repository, to make it real.
+The four commands above reproduce everything in this repository. The samjho
+gate itself was run by the orchestrator, from this repository's driver, against
+samjho's live database; the exact command and the verbatim output are recorded
+in "The live run" above. It is not reproducible from this repository alone
+because it needs samjho's checkout, virtualenv and the 1,004-chunk database on
+port 5439.

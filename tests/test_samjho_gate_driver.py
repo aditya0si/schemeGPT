@@ -7,8 +7,8 @@ drive the driver's wiring with signature-faithful stubs -- the same frozen
 signatures ``api.answer.answer_question`` and ``api.retriever.search`` declare --
 and prove a refusal and a degraded result survive the trip through the binding.
 
-The real end-to-end gate is not run here and no gate result is claimed; see
-``docs/evidence/SPINE-SECOND-CLIENT.md``.
+The real end-to-end gate runs outside this repository's test environment; its
+recorded result is in ``docs/evidence/SPINE-SECOND-CLIENT.md``.
 """
 
 from __future__ import annotations
