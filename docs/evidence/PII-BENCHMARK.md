@@ -162,8 +162,8 @@ Additional explicit limits:
   numeric kinds have no case. Nothing is left case-sensitive on purpose, so there
   is no deliberate case gap to state.
 - This benchmark measures detection only. The request-path integration and its
-  own tests are the separate Phase 6b section below; streaming overlap buffering
-  is Phase 6c.
+  own tests are the separate Phase 6b section below; the streaming path's
+  overlap-buffering guarantee is the separate Phase 6c section after it.
 
 ## Request-path integration (Phase 6b)
 
@@ -209,6 +209,101 @@ to the provider client; no real socket is observed.
 
 Known limitation: only the question is scanned. Free-text profile fields
 (`occupation`, `goals`) are not redacted in 6b.
+
+## Streaming path (Phase 6c)
+
+Phase 6c protects `POST /query/stream`, the remaining egress path. The stream has
+a property the synchronous path does not: **an identifier can be split across
+two SSE chunks**, so `...6846 218` in one chunk and `8 0111...` in the next are
+invisible to a per-chunk scan. Redacting each chunk independently would miss the
+identifier and ship silently. The fix is a bounded overlap buffer
+(`app/guardrails/stream.py`), wired into `app.stream.stream_answer`, built on the
+**same** request-scoped `Vault` as Phase 6b — the question is tokenised with it
+before it reaches a provider and the outbound tokens are restored/redacted with
+it. No second vault and no second mapping are created.
+
+### Hold-back size: 64 characters, derived
+
+The buffer never emits text within `HOLDBACK = 64` characters of the buffered
+edge, plus any trailing run of identifier-continuation characters. 64 is
+derived, not guessed:
+
+| Recognizer | Longest match | Length |
+| --- | --- | --- |
+| `gstin` | `[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]{3}` | **15** |
+| `aadhaar` (4-4-4 grouping) | `\d{4}[ -]\d{4}[ -]\d{4}` | 14 |
+| `mobile` | `+91 ` + 10 digits | 13 |
+| `ifsc` | `[A-Z]{4}0[A-Z0-9]{6}` | 11 |
+| `pan` | `[A-Z]{5}[0-9]{4}[A-Z]` | 10 |
+| `upi` | `local@handle` | unbounded |
+| `devanagari_digits` | `[०-९]{4,}` | unbounded |
+
+The longest **bounded** match is the 15-character GSTIN. The longest
+**placeholder** is `[[PII:` (6) + 8 (nonce) + `:` (1) + `DEVANAGARI_DIGITS` (17,
+the longest kind) + `:` (1) + index digits + `]]` (2) = 35 + index digits; a
+request's matches are bounded by the 2000-character question cap, so the index
+is at most four digits and the placeholder at most 39. **64** is the next power
+of two above both 15 and 39, leaving headroom in both directions.
+
+Two patterns have no finite maximum. They are not covered by the fixed number;
+instead the buffer never emits into a trailing run of identifier-continuation
+characters (ASCII letters/digits, `._@+-`, Devanagari numerals), so an open,
+unterminated UPI or Devanagari candidate is retained whole until a delimiter
+arrives or the stream ends. Normal prose has whitespace, so this does not
+buffer the whole stream: a 480-character identifier-free stream is emitted
+progressively (pinned by `test_a_long_stream_emits_progressively_not_only_at_flush`).
+
+### Flush and error/disconnect behaviour
+
+- **Normal end.** The held tail is flushed exactly once, immediately before the
+  first `quotes`/`done` event, so token events still precede both terminal
+  events. The flush transforms the whole held tail at once, so a complete
+  identifier that was still buffered is redacted (never emitted in pieces).
+- **Mid-stream error.** The reference `stream_answer` catches the provider
+  failure and emits an `error` event; the overlap buffer's tail is **discarded,
+  not flushed**. A held identifier fragment is therefore never emitted on the
+  error path.
+- **Client disconnect.** When the client drops the connection the async
+  generator is closed before its normal completion, so the tail is discarded in
+  the same way. A leak on an error path is still a leak, so neither path emits
+  held text.
+
+### Both directions, one pass
+
+Each safe span is transformed in one pass: restore the placeholders the inbound
+question produced *before generation* (so the citizen sees their own value),
+redact any identifier found in the streamed text (defence in depth for a raw
+value the model echoed or lifted from a source), then restore the
+pre-generation placeholders again. Placeholders minted for streamed identifiers
+that were **not** in the question stay redacted, because they are not in the
+pre-generation snapshot. A PII-bearing streaming request bypasses the semantic
+cache on both lookup and store, exactly as `POST /query` does, so no restored
+identifier can be replayed to a different request. Two streams that overlap in
+time hold two separate vaults and cannot unmask each other.
+
+### What is proven — and what is not
+
+**Proven (unit and integration, synthetic streams, no network):**
+`tests/test_guardrails_stream.py` (107 tests). The boundary battery drives an
+identifier split at **every one of its 42** split points and a placeholder at
+**every one of its 49** split points, plus 3 splits landing exactly on the
+hold-back edge — **94 split points, all passing**. Each asserts the emitted text
+is byte-identical to the expected redacted/restored stream, so no prefix or
+fragment can survive. The battery also covers the trailing-identifier flush, a
+clean stream passing through byte-identically and in order, the setting
+disabled, request-scoped isolation, and a mid-stream provider failure that keeps
+the held tail out of the output. Integration tests run the real `stream_answer`
+against a stubbed provider chain and assert the captured prompt contains no
+identifier (`find_all(...) == []`) while the client-facing tokens have the value
+restored.
+
+**Not proven:** the guarantee is over the text the redactor is handed, not over
+a real socket. No real provider endpoint is called and no network traffic is
+inspected; the provider client is stubbed. Only `token` event text is
+transformed — the `sources` and `quotes` event payloads are passed through
+unchanged, so raw identifiers could in principle appear in a source excerpt or a
+verified quote (the corpus is expected to be PII-free, but this is not asserted
+at the stream boundary). Free-text profile fields remain unredacted.
 
 ## How to reproduce
 

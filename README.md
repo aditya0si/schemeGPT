@@ -194,17 +194,20 @@ verifying that quoted text is an exact substring of the retrieved sources with
 no key, database, or network — is recorded in
 [`docs/evidence/OFFLINE-GENERATION.md`](docs/evidence/OFFLINE-GENERATION.md).
 
-**PII detection and redaction (Phase 6a/6b):** dependency-free, offline
+**PII detection and redaction (Phase 6a/6b/6c):** dependency-free, offline
 recognizers for Aadhaar (Verhoeff-checked), PAN, GSTIN, IFSC, UPI ids, Indian
 mobiles, and Devanagari-digit forms are regression-measured at recall/precision
 1.000 on a synthetic corpus with deliberate negatives — a self-consistency
 check, not a field result. On the synchronous `/query` path the recognizers now
 feed a request-scoped reversible vault: identifiers in the question are replaced
 with placeholders before the provider call and restored in the answer, and
-PII-bearing requests bypass the semantic cache. The frozen measurement, exact
-command, floors, integration facts, and an explicit statement of what this does
-*not* measure (streaming and free-text profile fields are not yet covered) are
-recorded in
+PII-bearing requests bypass the semantic cache. `/query/stream` uses the same
+vault behind a bounded overlap buffer (64-character hold-back) so an identifier
+split across SSE chunks is still redacted; the held tail is discarded on error
+or disconnect, never emitted. The frozen measurement, exact command, floors,
+integration facts, and an explicit statement of what this does *not* measure
+(free-text profile fields, and a streaming guarantee proven against a stubbed
+provider rather than a real network audit) are recorded in
 [`docs/evidence/PII-BENCHMARK.md`](docs/evidence/PII-BENCHMARK.md).
 
 **Cost engineering:** every LLM call is also a money event. Per-model token
