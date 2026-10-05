@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
 
+from app.quotes import parse_quotes
 from eval.offline_generation import (
+    ARCHIVE_GROUNDED_CASES,
+    ARCHIVE_QUOTE_LINES,
     REQUIRED_RECORD_KEYS,
     citation_metrics,
     evaluate,
@@ -17,6 +21,23 @@ from eval.offline_generation import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
+EVIDENCE_DOC = ROOT / "docs" / "evidence" / "OFFLINE-GENERATION.md"
+PROVENANCE_RE = re.compile(
+    r"<!--\s*offline-provenance:(?P<body>.*?)-->", re.DOTALL
+)
+
+
+def _documented_provenance() -> dict[str, int]:
+    match = PROVENANCE_RE.search(EVIDENCE_DOC.read_text(encoding="utf-8"))
+    assert match, (
+        "OFFLINE-GENERATION.md has no `<!-- offline-provenance: ... -->` "
+        "block; the evidence document must state the fixture's provenance"
+    )
+    return {
+        key: int(value)
+        for key, value in re.findall(r"([a-z_]+)\s*=\s*(\d+)", match.group("body"))
+    }
+
 
 SOURCE = {
     "source": "schemes/pm-kisan.md",
@@ -105,6 +126,32 @@ def test_evaluate_over_committed_fixture_matches_measured_baseline():
     assert summary["quote_verification_rate"] == 0.5
     assert summary["cases_with_citations"] == 2
     assert summary["citation_coverage"] == 0.25
+
+
+def test_evidence_document_matches_fixture_provenance():
+    _, records = load_fixture()
+
+    grounded_cases = sum(1 for record in records if record.get("sources"))
+    quote_lines = sum(
+        len(parse_quotes(record.get("answer", ""))) for record in records
+    )
+
+    # The fixture must agree with the module constants...
+    assert grounded_cases == ARCHIVE_GROUNDED_CASES
+    assert quote_lines == ARCHIVE_QUOTE_LINES
+
+    # ...and the committed evidence document must state those same values, so
+    # the artifact and the write-up cannot silently drift apart.
+    documented = _documented_provenance()
+    assert documented.get("grounded_cases") == ARCHIVE_GROUNDED_CASES, (
+        "OFFLINE-GENERATION.md states grounded_cases="
+        f"{documented.get('grounded_cases')}, but the fixture has "
+        f"{grounded_cases}"
+    )
+    assert documented.get("quote_lines") == ARCHIVE_QUOTE_LINES, (
+        "OFFLINE-GENERATION.md states quote_lines="
+        f"{documented.get('quote_lines')}, but the fixture has {quote_lines}"
+    )
 
 
 def test_gate_flags_below_floor_and_passes_at_baseline():

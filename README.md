@@ -179,7 +179,7 @@ quality remains a tracked metric, not a solved problem: the two remaining
 misses are the PM-SYM Hinglish question and the unorganised-worker profile
 question, which have no lexical anchor.
 
-<!-- claims: tests=267 evidence=18 -->
+<!-- claims: tests=268 evidence=18 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
