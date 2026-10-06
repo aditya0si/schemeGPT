@@ -52,7 +52,7 @@ export default async function Home() {
           />
         </div>
 
-        <h1 className="max-w-5xl font-sans text-[13vw] font-bold uppercase leading-[1.0] tracking-tight sm:text-7xl lg:text-8xl">
+        <h1 className="max-w-5xl font-sans text-[11.84vw] font-bold uppercase leading-[1.0] tracking-tight sm:text-7xl lg:text-8xl">
           <StaggeredText text="Ask your government." />
         </h1>
 

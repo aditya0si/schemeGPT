@@ -55,7 +55,12 @@
   }
 }
 
-.letter-stagger span {
+.letter-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.letter-stagger .letter {
   display: inline-block;
   opacity: 0;
   animation: letter-in 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
@@ -68,7 +73,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .letter-stagger span {
+  .letter-stagger .letter {
     animation: none;
     opacity: 1;
     transform: none;
