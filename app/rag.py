@@ -14,6 +14,7 @@ leaks a traceback or provider details to the browser.
 import json
 import logging
 import re
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,8 +28,10 @@ from app import semantic_cache
 from app.catalog import load_scheme_catalog_records
 from app.config import ROOT_DIR, settings
 from app.db import get_retriever as get_hybrid_retriever
-from app.quotes import parse_quotes, verify_quotes
+from app.ops import ops as operator
+from app.quotes import validate_quotes
 from app.schemas import ProfileData
+from app.temporal_answer import temporal_answer
 from app.tracing import stage_span
 
 logger = logging.getLogger(__name__)
@@ -160,6 +163,241 @@ HI_TRANSLATION_MISSING = (
     "बाद में पुनः प्रयास करें।"
 )
 
+# --- Retrieval-only (degraded) answers ---------------------------------------
+# Served when AI generation is unavailable: by operator decision (kill switch,
+# POST /ops/ai) or because the provider is failing and the circuit breaker is
+# open. These answers contain no generated text at all. The most relevant
+# sentences are copied verbatim out of the retrieved source documents into the
+# same "> <sentence> [<source>, <data_status>]" form the live prompt asks the
+# model for, so the existing quote verifier proves them mechanically and the
+# citizen can see exactly which document each line came from.
+#
+# Two rules this path holds to:
+#   * It never pretends to be a synthesised answer: the notice says AI
+#     generation is off and the text is excerpted from source documents.
+#   * It is never written to the semantic cache, which stores live answers
+#     only — a degraded answer must not be replayed later as a live one.
+DEGRADED_NOTICE = (
+    "Degraded mode: AI generation is disabled for this instance, so this "
+    "answer was assembled directly from the retrieved source documents with "
+    "no language model involved. The quoted lines are exact excerpts — read "
+    "them as source material, not as a synthesised answer."
+)
+DEGRADED_NOTICE_HI = (
+    "सीमित (डिग्रेडेड) मोड: इस इंस्टेंस पर एआई उत्तर-निर्माण बंद है, इसलिए यह "
+    "उत्तर बिना किसी भाषा-मॉडल के, सीधे प्राप्त स्रोत दस्तावेज़ों से तैयार "
+    "किया गया है। उद्धृत पंक्तियाँ स्रोत से ज्यों-की-त्यों ली गई हैं — इन्हें "
+    "स्रोत सामग्री मानें, संश्लेषित उत्तर नहीं।"
+)
+DEGRADED_PREFACE = {
+    "en": (
+        "AI generation is currently off for this instance. These are the "
+        "exact lines from the retrieved source documents that match your "
+        "question:"
+    ),
+    "hi": (
+        "इस इंस्टेंस पर एआई उत्तर-निर्माण अभी बंद है। आपके प्रश्न से मेल खाती "
+        "स्रोत दस्तावेज़ों की मूल पंक्तियाँ ये हैं:"
+    ),
+}
+DEGRADED_TAIL = {
+    "en": (
+        "No generated answer is available while AI generation is off. A "
+        "synthesised answer returns as soon as an operator re-enables it "
+        "(POST /ops/ai)."
+    ),
+    "hi": (
+        "एआई उत्तर-निर्माण बंद रहने तक कोई संश्लेषित उत्तर उपलब्ध नहीं है। "
+        "ऑपरेटर द्वारा इसे पुनः सक्षम करते ही संश्लेषित उत्तर लौट आएगा।"
+    ),
+}
+
+MIN_SENTENCE_CHARS = 40
+MAX_QUOTE_CHARS = 400
+MAX_QUOTES = 3
+
+# Split on sentence enders (Latin + Devanagari danda) and on blank lines.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?।])\s+|\n\s*\n")
+_TOKEN_RE = re.compile(r"[0-9a-z\u0900-\u097f]+")
+
+# Deliberately tiny stopword list: question words that would otherwise match
+# every sentence. Only used to rank *already retrieved* sentences.
+_STOPWORDS = frozenset(
+    """
+    a an and are as at be been by can do does for from has have how i in is it
+    its me my of on or should so that the their them there these this to was
+    were what when where which who whom why will with you your
+    """.split()
+)
+
+
+def _sentences(text: str) -> list[str]:
+    """Split source text into candidate quotation sentences."""
+    out: list[str] = []
+    for raw in _SENTENCE_SPLIT_RE.split(text or ""):
+        # Drop markdown structure and list/quote markers so a copied line
+        # reads as a statement, not as formatting.
+        cleaned = re.sub(r"^\s*(?:>|[-*+]|\d+[.)])\s*", "", raw).strip()
+        cleaned = " ".join(cleaned.split())
+        if cleaned:
+            out.append(cleaned)
+    return out
+
+
+def _query_tokens(question: str) -> set[str]:
+    tokens = {
+        token
+        for token in _TOKEN_RE.findall((question or "").lower())
+        if len(token) >= 3 and token not in _STOPWORDS
+    }
+    return tokens or set(_TOKEN_RE.findall((question or "").lower()))
+
+
+def _sentence_score(sentence: str, tokens: set[str]) -> int:
+    if not tokens:
+        return 0
+    present = {token for token in tokens if token in sentence.lower()}
+    return len(present)
+
+
+def _shorten(sentence: str, limit: int = MAX_QUOTE_CHARS) -> str:
+    """Cut a long sentence at a word boundary *without* adding punctuation.
+
+    The cut stays a verbatim substring of the source, so containment-based
+    quote verification still passes on it.
+    """
+    if len(sentence) <= limit:
+        return sentence
+    cut = sentence[:limit]
+    if " " in cut:
+        cut = cut[: cut.rfind(" ")]
+    return cut.strip()
+
+
+def _doc_to_source(doc) -> dict:
+    """Retrieved document -> the /query source shape (with provenance)."""
+    return {
+        "source": doc.metadata.get("source", ""),
+        "content": doc.page_content,
+        # `.get()` defaults keep old vectors (which lack these keys) working.
+        "jurisdiction": doc.metadata.get("jurisdiction"),
+        "state": doc.metadata.get("state"),
+        "data_status": doc.metadata.get("data_status"),
+        "last_verified": doc.metadata.get("last_verified"),
+        "source_url": doc.metadata.get("source_url"),
+    }
+
+
+def _quote_lines(docs: list, question: str, max_quotes: int = MAX_QUOTES) -> list[str]:
+    """Pick the best-matching sentence per document as a quote line.
+
+    Ranking is deterministic: score by distinct query-token overlap, then keep
+    document order (the retriever already ranked by relevance). Duplicate
+    sentences across documents are kept once, from the first document that
+    produced them.
+    """
+    tokens = _query_tokens(question)
+    candidates: list[tuple[int, int, str, dict]] = []
+    for doc_index, doc in enumerate(docs):
+        best: tuple[int, int, str] | None = None
+        for sent_index, sentence in enumerate(_sentences(doc.page_content)):
+            if len(sentence) < MIN_SENTENCE_CHARS:
+                continue
+            if "[" in sentence and sentence.rstrip().endswith("]"):
+                # Looks like a JSON/array fragment; a poor quotation.
+                continue
+            score = _sentence_score(sentence, tokens)
+            key = (score, -sent_index)
+            if best is None or key > best[:2]:
+                best = (score, -sent_index, sentence)
+        if best is not None:
+            candidates.append((best[0], doc_index, best[2], _doc_to_source(doc)))
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    lines: list[str] = []
+    seen: set[str] = set()
+    for _score_value, _doc_index, sentence, source in candidates:
+        key = re.sub(r"[^0-9a-z\u0900-\u097f]+", " ", sentence.lower()).strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        status = source.get("data_status")
+        suffix = f"{source.get('source', '')}, {status}" if status else str(
+            source.get("source", "")
+        )
+        lines.append(f"> {_shorten(sentence)} [{suffix}]")
+        if len(lines) >= max_quotes:
+            break
+    return lines
+
+
+def degraded_answer(
+    question: str,
+    language: str = "en",
+    profile: ProfileData | None = None,
+    reason: str = "unavailable",
+) -> dict:
+    """Assemble a retrieval-only answer with verbatim, verifiable quotes.
+
+    Retrieval only: no LLM call, no semantic-cache lookup or write. Raises
+    ``Exception`` if retrieval itself fails; callers that must always return
+    an HTTP 200 response should use :func:`fallback_answer` instead.
+    """
+    from app import metrics  # local import: metrics is a leaf module
+
+    lang = _normalize_language(language)
+    docs = get_retriever().invoke(question)
+    sources = [_doc_to_source(doc) for doc in docs]
+    lines = _quote_lines(list(docs), question)
+    parts = [DEGRADED_PREFACE[lang]]
+    if lines:
+        parts.extend(lines)
+    else:
+        parts.append(
+            "No matching lines were found in the indexed documents for this "
+            "question."
+            if lang == "en"
+            else "इस प्रश्न के लिए अनुक्रमित दस्तावेज़ों में कोई मेल खाती पंक्ति नहीं मिली।"
+        )
+    parts.append(DEGRADED_TAIL[lang])
+    metrics.inc("degraded_answers_total")
+    logger.warning(
+        "Serving retrieval-only answer (reason=%s, quotes=%d, sources=%d).",
+        reason,
+        len(lines),
+        len(sources),
+    )
+    return {
+        "answer": "\n\n".join(parts),
+        "sources": sources,
+        "mode": "degraded",
+        "notice": DEGRADED_NOTICE_HI if lang == "hi" else DEGRADED_NOTICE,
+        "language": lang,
+    }
+
+
+def fallback_answer(
+    question: str,
+    language: str = "en",
+    profile: ProfileData | None = None,
+    reason: str = "unavailable",
+) -> dict:
+    """Prefer a retrieval-only answer; fall back to the pre-made demo answer.
+
+    Used on every live-path failure so a provider or database problem degrades
+    to something grounded instead of canned text — and still returns a valid
+    response if retrieval is the thing that is broken.
+    """
+    try:
+        return degraded_answer(question, language, profile, reason=reason)
+    except Exception as exc:
+        logger.error(
+            "Retrieval-only fallback failed (%s); returning pre-made demo answer.",
+            type(exc).__name__,
+        )
+        return demo_answer(question, language)
+
+
 # Profile fields included in the compact profile context. ``display_name`` and
 # ``language`` are deliberately excluded: they are not scheme-matching signals
 # and excluding identity/derived fields shrinks the prompt-injection surface.
@@ -215,6 +453,14 @@ def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
     )
     if role == "judge" and settings.eval_judge_model.strip():
         model = settings.eval_judge_model.strip()
+    # Optional endpoint override: route generation through the customer's API
+    # gateway / egress proxy (GROQ_API_BASE) or a runtime override set by
+    # POST /ops/provider. Empty means "use the client's default endpoint".
+    base_url = operator.provider_base_url()
+    extra = {"groq_api_base": base_url} if base_url else {}
+    # Bound the provider call: a request must fail (and therefore fall back to a
+    # retrieval-only answer) in bounded time, never hang. See app/config.py for
+    # the measurement behind these defaults.
     return ChatGroq(
         model=model,
         api_key=key,
@@ -223,6 +469,9 @@ def get_llm(role: str = "answer", max_tokens: int = 1024) -> ChatGroq:
         # never consume unbounded output tokens. langchain-groq (pinned 0.3.5)
         # accepts this as a standard init arg.
         max_tokens=max_tokens,
+        request_timeout=settings.groq_timeout_s,
+        max_retries=settings.groq_max_retries,
+        **extra,
     )
 
 
@@ -552,49 +801,105 @@ def answer(
     question: str,
     language: str = "en",
     profile: ProfileData | None = None,
+    *,
+    skip_cache: bool = False,
+    as_of: date | None = None,
 ) -> dict:
     """Answer a question, optionally in Hindi and with a saved profile attached.
+
+    When ``as_of`` is set, the answer is resolved deterministically from the
+    committed dated-claims artifact (value in force on that date, its effective
+    range, its replacement and the verbatim source span) and no provider,
+    cache or retrieval is touched. This branch is strictly additive: with
+    ``as_of`` absent the function below is byte-for-byte the previous path.
 
     Live path: retrieve from pgvector and call ChatGroq via the LangChain
     chain. The language selects the cached per-language chain; the compact
     profile block is added to the prompt as clearly-delimited user-provided
-    data. The live build/invoke path sits behind one exception boundary: any
-    failure (missing/invalid/rate-limited Groq key, database or retrieval
-    error, ordinary runtime/API exception) is converted into a clearly-labelled
-    pre-made demo answer in the requested language so /query keeps returning
-    HTTP 200. ``mode`` is ``"live"`` for live responses and ``"demo"`` with a
-    localized notice for fallback.
+    data.
+
+    Three modes can come back, in this order of preference:
+
+    * ``live``     — a generated answer from the provider.
+    * ``degraded`` — a retrieval-only answer with verbatim source excerpts.
+      Served when an operator has switched AI generation off
+      (``POST /ops/ai``), when the provider circuit breaker is open, or when
+      the live call failed. No LLM output is involved.
+    * ``demo``     — a clearly-labelled pre-made answer, used when no API key
+      is configured at all, or when retrieval-only assembly also failed
+      (database unreachable). /query still returns HTTP 200 and never leaks a
+      traceback or provider details to the browser.
+
+    ``skip_cache=True`` disables both the semantic-cache lookup and the store
+    for this call while leaving every other tier, the kill switch, and the
+    provider breaker untouched. The PII integration uses it: a request that
+    carried an identifier is processed with redacted text and its (restored)
+    answer must never be cached or replayed to another request.
     """
     lang = _normalize_language(language)
+    if as_of is not None:
+        return temporal_answer(question, as_of, lang)
     profile_context = _build_profile_context(profile, lang)
     if not settings.groq_api_key.strip():
         return demo_answer(question, lang)
+
+    # Operator state is consulted exactly once per request, and the two refusal
+    # reasons deliberately behave differently:
+    #
+    #   kill_switch — a human stopped generation, usually because they doubt
+    #     what the model has been producing. Generated text must therefore not
+    #     be served at all, including live answers already sitting in the
+    #     semantic cache: replaying them would keep serving the very output the
+    #     operator distrusted, and would make the switch unobservable.
+    #   breaker — the provider is failing. That is an availability problem, not
+    #     a trust problem, so a cached live answer is still the best answer
+    #     available and is served; only new generation stops.
+    gate = operator.gate()
+    if gate == "kill_switch":
+        return fallback_answer(question, lang, profile, reason=gate)
     ph = semantic_cache.profile_hash(profile)
     # Capture the corpus generation once and carry it through lookup, retrieval,
     # and store so a concurrent rebuild cannot make one request mix generations.
     # An unknown generation fails closed: the cache is skipped and no unbound
     # live retrieval is attempted, so the labelled demo answer is returned.
+    # The open provider circuit is the deliberate exception: generation is not
+    # going to run, and a previously generated, revalidated cached answer is the
+    # best answer available, so a generation read failure must not turn that into
+    # a demo fallback.
     try:
         generation = semantic_cache.capture_generation()
     except Exception as exc:
-        logger.error(
-            "Corpus generation metadata unavailable (%s); returning demo answer.",
-            type(exc).__name__,
-        )
-        return demo_answer(question, lang)
-    if not generation:
+        if gate == "breaker":
+            generation = None
+        else:
+            logger.error(
+                "Corpus generation metadata unavailable (%s); returning demo answer.",
+                type(exc).__name__,
+            )
+            return demo_answer(question, lang)
+    if not generation and gate != "breaker":
         logger.error(
             "Corpus generation is uninitialized; disabling cache and live "
             "retrieval and returning demo answer."
         )
         return demo_answer(question, lang)
     with stage_span("cache_lookup") as span:
-        cached = semantic_cache.lookup(question, lang, ph, generation)
+        if skip_cache:
+            # PII path: never serve or store a cached answer. A restored
+            # identifier must not be replayed to a different request.
+            cached = None
+        elif generation:
+            cached = semantic_cache.lookup(question, lang, ph, generation)
+        else:
+            cached = semantic_cache.lookup(question, lang, ph)
         if span is not None:
             span.set_attribute("cache.hit", cached is not None)
     if cached is not None:
         validated = semantic_cache.revalidate_payload(cached)
         return {**validated, "cached": True}
+
+    if gate == "breaker":
+        return fallback_answer(question, lang, profile, reason=gate)
     try:
         usage = TokenUsageHandler()
         with stage_span("retrieve") as span:
@@ -620,11 +925,23 @@ def answer(
         # Fallback boundary: never leak exception text (which can contain
         # provider details or connection strings) to the browser, and never log
         # the API key. Only the exception type is logged server-side.
+        opened = operator.record_provider_failure(type(exc).__name__)
         logger.error(
-            "Live RAG chain failed (%s); returning pre-made demo answer.",
+            "Live RAG chain failed (%s); serving retrieval-only answer%s.",
             type(exc).__name__,
+            " and opening the provider circuit" if opened else "",
         )
-        return demo_answer(question, lang)
+        result = fallback_answer(question, lang, profile, reason="provider_failure")
+        # Carry the provider's own error identity -- the exception class and its
+        # HTTP status, never message text or secrets -- so a caller (the eval
+        # harness) can report *why* the fallback happened. Without this every
+        # provider failure is indistinguishable and gets misreported as a bad
+        # credential.
+        result["provider_error_type"] = type(exc).__name__
+        status = getattr(exc, "status_code", None)
+        result["provider_status_code"] = status if isinstance(status, int) else None
+        return result
+    operator.record_provider_success()
 
     sources = [
         {
@@ -639,7 +956,7 @@ def answer(
         }
         for doc in docs
     ]
-    verified_quotes = verify_quotes(parse_quotes(answer_text), sources)
+    verified_quotes = validate_quotes(answer_text, sources)
     payload = {
         "answer": answer_text,
         "sources": sources,
@@ -648,5 +965,6 @@ def answer(
         "mode": "live",
         "language": lang,
     }
-    semantic_cache.store(question, lang, ph, payload, generation)
+    if not skip_cache:
+        semantic_cache.store(question, lang, ph, payload, generation)
     return payload

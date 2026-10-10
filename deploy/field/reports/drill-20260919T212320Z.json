@@ -1,0 +1,28 @@
+{
+  "A_install_baseline": {
+    "image": "schemegpt:v1.0.0",
+    "health_seconds": 5.72,
+    "ops_status_code": 404,
+    "operator_endpoints": "absent (baseline build)",
+    "first_answer_mode": "live",
+    "first_answer_sources": 4,
+    "answer_seconds": 10.65
+  },
+  "B_upgrade": {
+    "exit_code": 127,
+    "seconds": 3.15,
+    "reported_version": null,
+    "ai_state": null,
+    "post_upgrade_mode": "live",
+    "batch_log": []
+  },
+  "error": "RuntimeError: upgrade failed:\n/bin/bash: C:UsersoliadDesktopSchemeGPTdeployfieldupgrade.sh: No such file or directory\n",
+  "meta": {
+    "tool": "schemegpt-field-drill",
+    "at": "20260919T212320Z",
+    "host": "Aditya",
+    "api": "http://127.0.0.1:8000",
+    "baseline_version": "v1.0.0",
+    "release_version": "v2.0.0"
+  }
+}

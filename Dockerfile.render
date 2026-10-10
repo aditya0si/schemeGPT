@@ -1,25 +1,39 @@
+# Render free-tier API image (512 MB RAM, 0.1 CPU, ~1 GB disk).
+#
+# Why this is not the main Dockerfile: that one installs PyTorch and bakes the
+# fp32 multilingual-e5-small checkpoint, which wants ~1-2 GB of resident memory
+# — more than a free instance has. This image runs the SAME model through ONNX
+# Runtime instead (fastembed; select it with EMBEDDING_BACKEND, see
+# app/config.py), which is a much smaller install and a much smaller process.
+#
+# The ONNX weights are fetched at BUILD time on purpose: a cold instance must
+# not spend its first request downloading ~450 MB from the Hugging Face Hub,
+# and the instance filesystem is ephemeral.
 FROM python:3.12-slim
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    # This image IS the ONNX one: keep the backend explicit so it cannot be
+    # forgotten at the service level and silently load PyTorch.
+    EMBEDDING_BACKEND=fastembed \
+    # Read the baked weights from an image path, not the ephemeral home cache.
+    FASTEMBED_CACHE_PATH=/app/.fastembed
 
-# CPU-only torch is installed from the official PyTorch CPU index before the
-# rest of the API dependencies; see requirements-api.txt. Local dev on
-# Windows/Python 3.12 keeps using requirements.txt unchanged.
-COPY requirements-api.txt requirements.txt ./
-RUN pip install --no-cache-dir \
-      --index-url https://download.pytorch.org/whl/cpu \
-      torch==2.14.0 && \
-    pip install --no-cache-dir -r requirements-api.txt
-
-# Render free tier (512 MB RAM) runs in labelled demo mode when GROQ_API_KEY
-# is unset, so we skip baking the multilingual-e5-small embedding model into
-# the image. render.yaml disables startup ingestion so the model is loaded
-# lazily only if a live answer is requested.
+COPY requirements-render.txt ./
+RUN pip install --no-cache-dir -r requirements-render.txt
 
 COPY app ./app
+
+# Warm the ONNX model cache into FASTEMBED_CACHE_PATH at build time. This goes
+# through the application's own loader on purpose: multilingual-e5-small is not
+# one of fastembed's built-in models, and app.embeddings registers its pooling
+# recipe before downloading the weights.
+RUN python -c "\
+from app.embeddings import FastEmbedEmbeddings; \
+FastEmbedEmbeddings('intfloat/multilingual-e5-small').embed_query('warm the ONNX cache')"
+
 COPY data ./data
 
 EXPOSE 8000

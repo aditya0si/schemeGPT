@@ -104,9 +104,14 @@ def gate_failures(summary: dict) -> list[str]:
 
 def run(
     top_k: int = DEFAULT_TOP_K,
-    output: Path = RESULTS_FILE,
+    output: Path | None = None,
     corpus_generation: str | None = None,
 ) -> tuple[dict, list[str]]:
+    # Resolve the module constant at CALL time, never bind it as a default
+    # argument. A default argument is evaluated once at import, so redirecting
+    # RESULTS_FILE (tests, tooling) would silently keep writing to the real
+    # evidence directory.
+    output = output or RESULTS_FILE
     from app.db import read_corpus_generation
     from app.rag import get_retriever
 
@@ -137,7 +142,7 @@ def run(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate production hybrid retrieval without an LLM key.")
     parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
-    parser.add_argument("--output", type=Path, default=RESULTS_FILE)
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
     if args.top_k < 1:
         parser.error("--top-k must be positive")

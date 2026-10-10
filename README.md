@@ -41,6 +41,12 @@
   - [Port Mappings](#port-mappings)
   - [Environment Variables](#environment-variables)
   - [Production VPS Runbook](#production-vps-runbook)
+- [Field Operations](#field-operations)
+  - [Preflight a host](#preflight-a-host)
+  - [Build an air-gap bundle](#build-an-air-gap-bundle)
+  - [Install, upgrade, roll back](#install-upgrade-roll-back)
+  - [Operate a running deployment](#operate-a-running-deployment)
+  - [Rehearse the failure modes](#rehearse-the-failure-modes)
 - [Local Development](#local-development)
 - [Groq API Key & Demo Fallback](#groq-api-key--demo-fallback)
 - [Evaluation Suite](#evaluation-suite)
@@ -65,6 +71,9 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 - **FastAPI + Next.js 16**: Asynchronous FastAPI service streaming Server-Sent Events to an editorial Next.js 16 frontend and Streamlit demo.
 - **Bilingual EN/HI**: Native multi-lingual query understanding, cross-language vector retrieval, and localized UI controls.
 - **Quote-verified answers**: Deterministic exact substring validation preventing fabricated clauses, amounts, or guidelines.
+- **As-of answers (dated claims)**: Deterministic "what did this scheme say on <date>" answers over the rate ladders the corpus documents declare, returning the value in force on that date with the verbatim sentence it came from, and refusing outright — never substituting the current value — when the era cannot be established (79 of 2,105 documents declare any date).
+- **Operator control plane**: AI kill switch, provider circuit breaker, and runtime provider-endpoint override, so generation can be stopped, rerouted, or degraded to retrieval-only answers without taking the service down (`GET /ops/status`).
+- **Field deployment kit**: air-gap install bundle with checksums and signatures, host preflight doctor (TLS interception, clock skew, egress policy), upgrade with database+config snapshot, and a rehearsed automatic rollback (`deploy/field/`).
 
 ---
 
@@ -72,6 +81,7 @@ Indian government welfare schemes are fragmented across 30+ central ministry por
 
 - **Hybrid RRF Search**: Fuses pgvector cosine search, PostgreSQL `tsvector` keyword search, and a lexical scheme-name channel with Reciprocal Rank Fusion, then keeps one chunk per source for a source-diverse top-4.
 - **Exact Quote Verification**: Cross-references every generated statement against source Markdown chunks via strict substring matching.
+- **As-Of Answers**: Resolves "the value in force on <date>" from the effective dates a source document declares, cites the verbatim span, names the replacement and its date, and refuses honestly rather than substituting a current value — without a language model and without a point-in-time copy of the corpus.
 - **Multi-Step Agent Retrieval**: Executes iterative tool-calling sequences for comparative, multi-scheme, and constraint-heavy queries.
 - **Deterministic Profile Matching**: Recommends applicable welfare programs based on demographic, income, occupational, and location parameters without ungrounded LLM guessing.
 - **SSE Token Streaming**: Streams live answer tokens and intermediate agent search events via Server-Sent Events.
@@ -156,17 +166,29 @@ deterministic gate against 16 source-labelled English, Hindi, Hinglish, profile,
 and jurisdiction cases. It exercises the production three-channel hybrid
 retriever (dense pgvector + Postgres full-text + lexical scheme-name matching,
 fused with RRF and kept source-diverse in the top-4) and fails on incomplete
-coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. On the full
-ingested corpus generation `7213926b8590933d...` (2,105 markdown files, ~20k
-chunks), run `34847304948` (pull request) and its follow-up on `main`
-(`34850488645`) measured **Hit@4 0.875** and **MRR@4 0.765625** across 16/16
-completed cases with 0 retrieval errors; each run uploads
-`retrieval_scores.json`. This is the measured result of those CI runs on that
-corpus generation, reproducible with `python -m eval.retrieval_gate` after
-ingest, not an ongoing production benchmark. Retrieval quality remains a tracked
-metric, not a solved problem: the two remaining misses are the PM-SYM Hinglish
-question and the unorganised-worker profile question, which have no lexical
-anchor.
+coverage, retrieval errors, Hit@4 below 0.85, or MRR@4 below 0.60. The gate was
+found to be **plan-dependent**: the lexical channel broke ties on unspecified
+Postgres row order, so the same corpus, model and configuration returned both
+0.875 and 0.8125. That was fixed by data-only tie-breaking, which exposed a
+second defect: `_select_diverse` capped one chunk per *source string*, so a
+scheme indexed twice (hand-verified `schemes/pm-kisan.md` and auto-imported
+`myscheme/pm-kisan.md`) could spend two provenance slots and squeeze out the
+verified copy. The diversity rule now caps one chunk per **logical document**
+(basename, `(N)` duplicate suffix stripped) and promotes the highest-trust copy
+by `data_status`, so the verified document is cited in preference to the
+automated import. The now-reproducible measurement on the full ingested corpus
+generation `7213926b8590933d...` (2,105 markdown files, ~20k chunks) is **Hit@4
+0.875** and **MRR@4 0.796875** across 16/16 completed cases with 0 retrieval
+errors, identical on 5 separate runs — **above the 0.85 floor, so the gate
+PASSES**. The two remaining deterministic misses are the PM-SYM Hinglish and
+unorganised-worker profile questions, neither of which has a lexical anchor. The
+frozen measurement — the exact command, the corpus generation and chunk count,
+the embedding model, the date, and an explicit statement of what is *not*
+claimed — is recorded in
+[`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
+quality remains a tracked metric, not a solved problem.
+
+<!-- claims: tests=573 evidence=22 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality
@@ -175,14 +197,60 @@ had only 5–18 scores out of 20), so it is not presented as a valid baseline.
 `python -m eval.run_eval --gate` now requires every selected row to be completely
 scored with zero pipeline/evaluation errors before aggregate floors can pass.
 The manual `Live generation quality experiment` workflow uploads the report, scores, and run
-history; no generation baseline will be published until a full set completes.
+history; no generation baseline will be published until a full set completes. An
+offline regression baseline over the archived 2026-09-01 live-run capture —
+verifying that quoted text is an exact substring of the retrieved sources with
+no key, database, or network — is recorded in
+[`docs/evidence/OFFLINE-GENERATION.md`](docs/evidence/OFFLINE-GENERATION.md).
 
-**Cost engineering:** per-model token usage is tracked on `/metrics`
-(reference list-price mapping in `app/rag.py`), the semantic cache serves
-paraphrased repeats without an LLM call (hit rate on `/metrics`), invalidates
-entries when the verifier contract, embedding model, answer model, answer-prompt
-version, or corpus generation changes, and re-verifies quote flags on every hit. The per-IP token bucket (`RATE_LIMIT_RPM`, default 20/min) keeps a public
-deployment inside the shared free-tier quota.
+**PII detection and redaction (Phase 6a/6b/6c):** dependency-free, offline
+recognizers for Aadhaar (Verhoeff-checked), PAN, GSTIN, IFSC, UPI ids, Indian
+mobiles, and Devanagari-digit forms are regression-measured at recall/precision
+1.000 on a synthetic corpus with deliberate negatives — a self-consistency
+check, not a field result. On the synchronous `/query` path the recognizers now
+feed a request-scoped reversible vault: identifiers in the question are replaced
+with placeholders before the provider call and restored in the answer, and
+PII-bearing requests bypass the semantic cache. `/query/stream` uses the same
+vault behind a bounded overlap buffer (64-character hold-back) so an identifier
+split across SSE chunks is still redacted; the held tail is discarded on error
+or disconnect, never emitted. The frozen measurement, exact command, floors,
+integration facts, and an explicit statement of what this does *not* measure
+(free-text profile fields, and a streaming guarantee proven against a stubbed
+provider rather than a real network audit) are recorded in
+[`docs/evidence/PII-BENCHMARK.md`](docs/evidence/PII-BENCHMARK.md).
+
+**Temporal (as-of) answers:** the deterministic "what did this scheme say on
+<date>" path reads the effective-dated values a source document declares and
+returns the one in force on the requested day, with the verbatim sentence it came
+from and the value that superseded it — no language model, no historical copy of
+the corpus. Its golden set is **derived, not hand-written**: 124 cases from 10
+ladders, regenerable byte-identically from a frozen artifact of 41 claims. Every
+consistency floor — as-of, boundary, supersession, refusal, and retrieval-gate
+invariance — measures **1.000**, and era-mixing **0.000**; the retrieval gate
+still reports 16/16 · Hit@4 0.875 · MRR@4 0.796875. The capability is
+deliberately narrow and the limits are published with the numbers: only **79 of
+2,105** documents declare any date (1,982 declare none), there is no
+per-document revision chain, and the gate is a **consistency** check that proves
+the code reflects the artifact, not that any ladder is correct. The frozen
+measurement, the question → claim → verbatim-span → source provenance chain, a
+worked FADCS example, and an explicit statement of the coverage ceiling are
+recorded in [`docs/evidence/TEMPORAL-GATE.md`](docs/evidence/TEMPORAL-GATE.md).
+
+**Cost engineering:** every LLM call is also a money event. Per-model token
+usage is tracked on `/metrics` alongside a USD **cost ledger** (`cost.total`,
+`cost.by_model`, `cost.per_request_avg`, `cost.unpriced_calls`) computed from a
+static price table in `app/pricing.py`. Prices are Groq list rates per
+1,000,000 tokens: `openai/gpt-oss-120b` at `$0.15` in / `$0.60` out and
+`openai/gpt-oss-20b` at `$0.075` in / `$0.30` out (verified 2026-10-05;
+provenance is recorded on each entry's `source`). The ledger is honest about its
+limits: Groq's 50% prompt-cache and batch discounts are not modelled, so
+cached or batched calls are over-reported at list price, and a model with no
+price entry is counted in `unpriced_calls` rather than silently costed at zero.
+The semantic cache serves paraphrased repeats without an LLM call (hit rate on
+`/metrics`), invalidates entries when the verifier contract, embedding model,
+answer model, answer-prompt version, or corpus generation changes, and
+re-verifies quote flags on every hit. The per-IP token bucket (`RATE_LIMIT_RPM`,
+default 20/min) keeps a public deployment inside the shared free-tier quota.
 
 ---
 
@@ -311,7 +379,11 @@ SchemeGPT/
 | `PUT /profiles/{id}` | `PUT` | Update saved citizen profile. | Header: `X-Profile-Token` |
 | `DELETE /profiles/{id}`| `DELETE` | Delete saved citizen profile. | Header: `X-Profile-Token` |
 | `POST /ingest` | `POST` | Trigger re-ingestion of `data/schemes` & `data/states` vectors. | Header: `X-Admin-Token` |
-| `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage. | None |
+| `GET /ops/status` | `GET` | Operator snapshot: AI switch state, provider circuit breaker, degraded-answer counters, masked provider endpoint. | None |
+| `POST /ops/ai` | `POST` | Operator kill switch: stop LLM generation for this instance and serve retrieval-only answers; the decision persists across restarts. | Header: `X-Admin-Token` |
+| `POST /ops/provider` | `POST` | Repoint generation at another endpoint (customer API gateway, egress proxy, secondary provider) at runtime. | Header: `X-Admin-Token` |
+| `GET /ops/audit` | `GET` | Bounded, sanitized operator audit trail (who disabled generation, when, why). | Header: `X-Admin-Token` |
+| `GET /metrics` | `GET` | Observability metrics: request counters, latency percentiles, semantic-cache hit rate, per-model token usage, and the USD cost ledger. | None |
 | `POST /feedback` | `POST` | Thumbs-up/down rating on one answer; curated ratings grow the eval set (`scripts/feedback_to_eval.py`). | None |
 
 ---
@@ -365,6 +437,64 @@ cp .env.example .env && docker compose up -d --build
    # Restore snapshot
    docker compose exec -T db psql -U scheme -d schemegpt < backup_schemegpt.sql
    ```
+
+---
+
+## Field Operations
+
+Everything above gets the stack running on a machine you control. This section is for the other case: a machine you *don't* control, a network that blocks egress, and a change that has to be reversible. The tooling lives in [`deploy/field/`](deploy/field/) and the runbook is [`docs/FIELD-DEPLOY.md`](docs/FIELD-DEPLOY.md); measured results from a full rehearsal are in [`docs/evidence/FIELD-DRILL.md`](docs/evidence/FIELD-DRILL.md).
+
+### Preflight a host
+
+```bash
+python3 deploy/field/preflight.py --label "customer-prod-01" \
+    --json deploy/field/reports/preflight-customer-prod-01.json
+```
+
+A stdlib-only doctor (no venv, no pip, no internet) with stable finding codes: Docker and Compose availability, disk/memory/CPU, port collisions, DNS and TCP egress to the registry and the model provider, **corporate TLS interception**, **clock skew measured against the provider's `Date` header**, `.env` key presence (values are never printed), images and corpus. `--airgap` mode reclassifies the expected offline findings as informational. Exit codes: `0` go, `1` blockers, `2` go with warnings.
+
+### Build an air-gap bundle
+
+```bash
+bash deploy/field/bundle.sh --version v2.0.0 --sign
+```
+
+Images as tarballs plus `MANIFEST.json` (immutable image IDs and digests), `SHA256SUMS`, an optional detached RSA-3072 signature, and the install scripts. On the far side:
+
+```bash
+./verify.sh --signature   # checksums + signature, before anything is loaded
+./install.sh --airgap     # verify, load, preflight, start, health-gate, smoke
+```
+
+`install.sh` refuses to start without a `.env` — secrets are never generated silently — and gates on `/health` **and** `/ops/status`, accepting a 404 there so this kit can upgrade *from* a build that predates the operator control plane.
+
+### Install, upgrade, roll back
+
+```bash
+bash deploy/field/upgrade.sh --to-version v2.0.1     # snapshot, gate, smoke, auto-rollback
+bash deploy/field/rollback.sh                         # back to the recorded previous version
+```
+
+An upgrade snapshots the database **and the environment file** (a release is code *and* configuration), pins the new image, gates on health *and* on a real `POST /query`, and compares the vector-store row count before and after — a migration that drops rows is a data incident no health check can see. Any failure triggers an automatic rollback of image and config, with both attempts recorded as JSON under `deploy/field/logs/`.
+
+### Operate a running deployment
+
+```bash
+curl -s http://127.0.0.1:8000/ops/status     # AI state, circuit breaker, degraded counters
+curl -s -X POST http://127.0.0.1:8000/ops/ai \
+  -H "X-Admin-Token: $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": false, "reason": "pilot review", "actor": "oncall"}'
+```
+
+The kill switch stops generation and serves **retrieval-only answers**: the same endpoint, HTTP 200, `mode: "degraded"`, and an answer assembled from verbatim source excerpts whose citation lines are verified mechanically. No generated prose, no pretending, and the decision survives a restart. `/health` deliberately stays `ok` while generation is off — a human pressed a switch, so the container must not be restarted for it. The provider circuit breaker opens after repeated failures and stops calling a provider that is already failing, then recovers with a single probe.
+
+### Rehearse the failure modes
+
+```bash
+python3 deploy/field/drill.py --phases A,B,C,D,E,F,G
+```
+
+Drives a real deployment through install, upgrade, a deliberately broken release (which must fail its gate and roll back by itself), the kill switch (including a container restart to prove persistence), a sustained provider outage against a local stub, and a no-egress window — writing measured results to `docs/evidence/FIELD-DRILL.md`. Nothing in the drill reaches a real provider: the stub is attached through `POST /ops/provider`, so it is deterministic and free.
 
 ---
 

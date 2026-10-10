@@ -36,6 +36,7 @@ async function getCoverage(): Promise<{
 
 export default async function Home() {
   const { jurisdictions, verified, apiReachable } = await getCoverage();
+  const apiConfigured = Boolean(process.env.API_URL?.trim());
   return (
     <div>
       <section className="px-4 pb-10 pt-14 lg:px-14 lg:pt-20">
@@ -47,10 +48,11 @@ export default async function Home() {
             jurisdictions={jurisdictions}
             verified={verified}
             apiReachable={apiReachable}
+            apiConfigured={apiConfigured}
           />
         </div>
 
-        <h1 className="max-w-5xl font-sans text-[13vw] font-bold uppercase leading-[1.0] tracking-tight sm:text-7xl lg:text-8xl">
+        <h1 className="max-w-5xl font-sans text-[11.84vw] font-bold uppercase leading-[1.0] tracking-tight sm:text-7xl lg:text-8xl">
           <StaggeredText text="Ask your government." />
         </h1>
 
@@ -60,19 +62,19 @@ export default async function Home() {
           statements they rely on.
         </p>
 
-        {!apiReachable ? (
+        {!apiReachable && apiConfigured ? (
           <div className="mt-6 max-w-2xl border-l-4 border-ink/40 bg-paper-dim p-4">
             <p className="font-mono text-xs font-bold uppercase tracking-wide text-ink">
               API Service Notice
             </p>
             <p className="mt-1 font-sans text-sm leading-relaxed text-ink/80">
-              The SchemeGPT backend is currently offline or in cold start (Render free tier sleeps when inactive). Example queries and demo answers remain fully functional.
+              The SchemeGPT backend is currently offline or in cold start. Example queries and demo answers remain fully functional.
             </p>
           </div>
         ) : null}
       </section>
 
-      <Chat initialApiReachable={apiReachable} />
+      <Chat initialApiReachable={apiReachable} apiConfigured={apiConfigured} />
     </div>
   );
 }

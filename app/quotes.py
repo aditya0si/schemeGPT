@@ -104,3 +104,14 @@ def verify_quotes(
             )
         )
     return verified_out
+
+
+def validate_quotes(answer_text: str, sources: list[dict]) -> list[VerifiedQuote]:
+    """Extract an answer's quote lines and verify them against its sources.
+
+    The validate seam: :func:`parse_quotes` followed by :func:`verify_quotes`,
+    in the one order production ever uses. It lives next to the two steps it
+    composes so the synchronous pipeline, the SSE path, the cache's revalidation
+    and the offline scorer all share a single call.
+    """
+    return verify_quotes(parse_quotes(answer_text), sources)

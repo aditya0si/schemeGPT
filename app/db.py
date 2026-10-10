@@ -1,16 +1,48 @@
+import asyncio
 import logging
+import sys
 from functools import lru_cache
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_postgres import Column, PGEngine, PGVectorStore
 from sqlalchemy import create_engine, text
 
 from app.config import settings
-from app.embeddings import E5PrefixEmbeddings, needs_e5_prefixes
+from app.embeddings import build_embeddings
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_windows_selector_event_loop_policy() -> None:
+    """Run psycopg3's async I/O on a selector loop on Windows.
+
+    ``langchain_postgres.PGEngine`` (via ``get_pg_engine``) drives SQLAlchemy's
+    async engine with the psycopg3 async driver. psycopg3 refuses Windows'
+    default ``ProactorEventLoop`` and raises::
+
+        Psycopg cannot use the 'ProactorEventLoop' to run in async mode.
+
+    That breaks ingestion in :func:`ensure_vector_table` and retrieval in
+    :func:`get_vectorstore` (``similarity_search_with_score``). Linux and the
+    containers already default to a selector loop, so this guard is Windows-only
+    and leaves other platforms byte-for-byte unchanged. It runs at import time,
+    before any async ``PGEngine`` connection can be created; that also covers a
+    server started with ``uvicorn app.main:app``, whose loop is built from the
+    policy after this module is imported. Idempotent: a policy that is already
+    the selector policy is left untouched.
+
+    Verified with:
+        ./.venv/Scripts/python.exe -m pytest tests/test_db.py -q
+    """
+    if sys.platform != "win32":
+        return
+    policy = asyncio.get_event_loop_policy()
+    if not isinstance(policy, asyncio.WindowsSelectorEventLoopPolicy):
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+_ensure_windows_selector_event_loop_policy()
 
 # The maintained adapter uses an application-owned table instead of the legacy
 # langchain_pg_collection/langchain_pg_embedding schema. Existing deployments
@@ -42,11 +74,15 @@ def _database_url_for_psycopg(url: str) -> str:
 
 @lru_cache
 def get_embeddings() -> Embeddings:
-    """Local embeddings, E5-prefixed when the model follows the convention."""
-    inner: Embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model)
-    if needs_e5_prefixes(settings.embedding_model):
-        return E5PrefixEmbeddings(inner)
-    return inner
+    """Embeddings for the configured backend, E5-prefixed when required.
+
+    Which runtime runs the model is a deployment decision (EMBEDDING_BACKEND):
+    PyTorch for local work, ONNX Runtime for the free-tier image that cannot
+    hold PyTorch plus the fp32 checkpoint inside 512 MB. The corpus and the
+    queries must be embedded by the same backend, or they land in slightly
+    different vector spaces.
+    """
+    return build_embeddings(settings.embedding_model, settings.embedding_backend)
 
 
 @lru_cache

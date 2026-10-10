@@ -29,7 +29,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.db import get_engine, read_corpus_generation, stored_corpus_generation
 from app.metrics import inc
-from app.quotes import parse_quotes, verify_quotes
+from app.quotes import validate_quotes
 
 logger = logging.getLogger(__name__)
 
@@ -145,8 +145,8 @@ def cache_namespace(generation: Any = _UNSET) -> str:
 def revalidate_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Recompute citation flags from cached answer text and current sources."""
     validated = dict(payload)
-    quotes = verify_quotes(
-        parse_quotes(str(validated.get("answer", ""))),
+    quotes = validate_quotes(
+        str(validated.get("answer", "")),
         list(validated.get("sources") or []),
     )
     validated["quotes"] = [quote.__dict__ for quote in quotes]

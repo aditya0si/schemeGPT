@@ -1,0 +1,72 @@
+name: PII recognizer benchmark
+
+# Proof that the PII detection core can be regression-tested offline: the
+# recognizers are pure Python and the corpus is a committed fixture, so this
+# job needs no provider credential, no database, and no network. GROQ_API_KEY
+# is set explicitly empty and no secret is referenced anywhere below.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/guardrails/**"
+      - "eval/pii_benchmark.py"
+      - "eval/fixtures/pii_synthetic_corpus.jsonl"
+      - "scripts/generate_synthetic_pii_corpus.py"
+      - "tests/test_guardrails_recognizers.py"
+      - "tests/test_pii_benchmark.py"
+      - "docs/evidence/PII-BENCHMARK.md"
+      - ".github/workflows/pii-benchmark.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/guardrails/**"
+      - "eval/pii_benchmark.py"
+      - "eval/fixtures/pii_synthetic_corpus.jsonl"
+      - "scripts/generate_synthetic_pii_corpus.py"
+      - "tests/test_guardrails_recognizers.py"
+      - "tests/test_pii_benchmark.py"
+      - "docs/evidence/PII-BENCHMARK.md"
+      - ".github/workflows/pii-benchmark.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pii-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pii-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No `pip install`: the recognizers are stdlib-only.
+      - name: Regenerate the synthetic corpus and assert byte-stability
+        run: |
+          cp eval/fixtures/pii_synthetic_corpus.jsonl /tmp/corpus.committed.jsonl
+          python scripts/generate_synthetic_pii_corpus.py
+          diff -u /tmp/corpus.committed.jsonl eval/fixtures/pii_synthetic_corpus.jsonl
+
+      - name: Score the recognizers (empty key, no database, no network)
+        env:
+          GROQ_API_KEY: ""
+        run: >-
+          python -m eval.pii_benchmark
+          --fixture eval/fixtures/pii_synthetic_corpus.jsonl
+          --output eval/results/pii_benchmark.json
+
+      - name: Upload machine-readable results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pii-benchmark-${{ github.sha }}
+          path: eval/results/pii_benchmark.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useLanguage } from "./LanguageProvider";
+import { OfflinePanel } from "./OfflinePanel";
 import { SourceCard, type Source } from "./SourceCard";
 
 type Quote = {
@@ -24,6 +25,7 @@ type Msg = {
   mode?: "live" | "demo";
   notice?: string | null;
   error?: string;
+  offline?: boolean;
   feedback?: "up" | "down" | "sent";
 };
 
@@ -71,7 +73,13 @@ const EXAMPLE_QUESTIONS: Record<"en" | "hi", { label: string; query: string }[]>
   ],
 };
 
-export function Chat({ initialApiReachable = true }: { initialApiReachable?: boolean }) {
+export function Chat({
+  initialApiReachable = true,
+  apiConfigured = true,
+}: {
+  initialApiReachable?: boolean;
+  apiConfigured?: boolean;
+}) {
   const { lang } = useLanguage();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -109,6 +117,10 @@ export function Chat({ initialApiReachable = true }: { initialApiReachable?: boo
         const detail = await resp
           .json()
           .catch(() => ({ error: "Request failed." }));
+        if (detail.offline === true) {
+          patch((a) => ({ ...a, streaming: false, offline: true }));
+          return;
+        }
         const errorMessage =
           resp.status === 502
             ? (detail.error ||
@@ -213,6 +225,12 @@ export function Chat({ initialApiReachable = true }: { initialApiReachable?: boo
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16">
+      {!apiConfigured && messages.length === 0 ? (
+        <div className="mb-8">
+          <OfflinePanel />
+        </div>
+      ) : null}
+
       <ul className="space-y-8">
         {messages.map((m, i) =>
           m.role === "user" ? (
@@ -223,6 +241,8 @@ export function Chat({ initialApiReachable = true }: { initialApiReachable?: boo
             </li>
           ) : (
             <li key={i} className="space-y-3">
+              {m.offline ? <OfflinePanel /> : null}
+
               {m.streaming ? (
                 <div className="inline-flex items-center gap-2 border border-ink/30 bg-paper-dim px-3 py-1 text-ink">
                   <span className="inline-block h-2 w-2 animate-pulse bg-live" aria-hidden="true" />
