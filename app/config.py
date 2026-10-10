@@ -9,6 +9,14 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     database_url: str = "postgresql+psycopg://scheme:scheme@localhost:5432/schemegpt"
     embedding_model: str = "intfloat/multilingual-e5-small"
+    # Embedding runtime. "sentence_transformers" is the local/dev default
+    # (PyTorch). "fastembed" runs the same model through ONNX Runtime with no
+    # torch dependency, which is what lets the API fit a 512 MB free instance
+    # (torch + the fp32 checkpoint needs ~1-2 GB). Whichever backend embeds the
+    # corpus must be the one that embeds queries: the two runtimes are
+    # numerically close but not bit-identical, so mixing them would put the
+    # query in a slightly different vector space than the stored rows.
+    embedding_backend: str = "sentence_transformers"
     groq_model: str = "openai/gpt-oss-120b"
     # Small, fast model for cheap sub-tasks (normalization, routing).
     groq_fast_model: str = "openai/gpt-oss-20b"

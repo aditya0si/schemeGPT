@@ -5,12 +5,11 @@ from functools import lru_cache
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_postgres import Column, PGEngine, PGVectorStore
 from sqlalchemy import create_engine, text
 
 from app.config import settings
-from app.embeddings import E5PrefixEmbeddings, needs_e5_prefixes
+from app.embeddings import build_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +74,15 @@ def _database_url_for_psycopg(url: str) -> str:
 
 @lru_cache
 def get_embeddings() -> Embeddings:
-    """Local embeddings, E5-prefixed when the model follows the convention."""
-    inner: Embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model)
-    if needs_e5_prefixes(settings.embedding_model):
-        return E5PrefixEmbeddings(inner)
-    return inner
+    """Embeddings for the configured backend, E5-prefixed when required.
+
+    Which runtime runs the model is a deployment decision (EMBEDDING_BACKEND):
+    PyTorch for local work, ONNX Runtime for the free-tier image that cannot
+    hold PyTorch plus the fp32 checkpoint inside 512 MB. The corpus and the
+    queries must be embedded by the same backend, or they land in slightly
+    different vector spaces.
+    """
+    return build_embeddings(settings.embedding_model, settings.embedding_backend)
 
 
 @lru_cache
