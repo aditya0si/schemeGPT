@@ -9,10 +9,21 @@ applies the prefixes transparently so callers (PGVectorStore, evaluation, the hy
 retriever) never need to know about the convention.
 """
 
+import os
+
 from langchain_core.embeddings import Embeddings
 
 # The default multilingual embedding model (see app.config.Settings).
 EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-small"
+
+# Which ONNX graph fastembed loads for that model. The fp32 export
+# (``onnx/model.onnx``) is 470 MB and costs roughly that much resident memory once
+# the session maps it — measured as the cause of an OOM kill at 512 MiB on the free
+# Render instance, on the first query that needed the model. The int8 export
+# (``onnx/model_qint8_avx512_vnni.onnx``) is 118 MB and moved vectors by a mean
+# cosine of 0.989 against 60 real corpus chunks. Overridable so a deployment can
+# choose the smaller graph without a code change.
+EMBEDDING_MODEL_FILE = os.environ.get("EMBEDDING_MODEL_FILE", "onnx/model.onnx")
 
 
 def needs_e5_prefixes(model_name: str) -> bool:
@@ -75,7 +86,7 @@ def _register_fastembed_model(model_name: str) -> None:
             normalization=True,
             sources=ModelSource(hf=model_name),
             dim=dim,
-            model_file="onnx/model.onnx",
+            model_file=EMBEDDING_MODEL_FILE,
         )
 
     _FASTEMBED_REGISTERED.add(model_name)
