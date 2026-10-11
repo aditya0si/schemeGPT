@@ -1,0 +1,19 @@
+{
+  "B_upgrade": {
+    "exit_code": 1,
+    "seconds": 4.26,
+    "reported_version": null,
+    "ai_state": null,
+    "post_upgrade_mode": "live",
+    "batch_log": []
+  },
+  "error": "RuntimeError: upgrade failed:\n[21:29:22] FATAL: image schemegpt-api:v2.0.0 is not present locally. Load the bundle or build it first.\n",
+  "meta": {
+    "tool": "schemegpt-field-drill",
+    "at": "20260919T212922Z",
+    "host": "Aditya",
+    "api": "http://127.0.0.1:8000",
+    "baseline_version": "v1.0.0",
+    "release_version": "v2.0.0"
+  }
+}

@@ -12,3 +12,14 @@ eval/results/*.json
 eval/results/*.csv
 eval/results/history.jsonl
 data/feedback.jsonl
+
+# Field kit runtime state (deploy/field/): logs and deploy records ARE tracked
+# as engagement evidence (see docs/FIELD-DEPLOY.md); snapshots and images are not.
+deploy/field/logs/
+deploy/field/state/
+deploy/field/backups/
+deploy/field/bundles/
+var/
+
+# Editor / scratch
+.zed/

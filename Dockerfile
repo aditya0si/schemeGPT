@@ -22,6 +22,12 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 COPY app ./app
 COPY data ./data
 
+# Build identity: reported by GET /ops/status so a running container can be tied
+# back to the commit it was built from. Placed last on purpose — changing the
+# SHA must not invalidate the cached dependency/model layers above it.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -2,11 +2,21 @@ export function CoveragePill({
   jurisdictions,
   verified,
   apiReachable = true,
+  apiConfigured = true,
 }: {
   jurisdictions: number | null;
   verified: number | null;
   apiReachable?: boolean;
+  apiConfigured?: boolean;
 }) {
+  if (!apiConfigured) {
+    return (
+      <div className="inline-flex items-center gap-2 border border-ink/25 bg-paper-dim px-3 py-1 font-mono text-[11px] uppercase tracking-wide text-ink/70">
+        <span className="h-2 w-2 bg-signal" aria-hidden="true" />
+        <span>Live API not deployed · measured results shown</span>
+      </div>
+    );
+  }
   if (!apiReachable || jurisdictions == null) {
     return (
       <div className="inline-flex items-center gap-2 border border-ink/25 bg-paper-dim px-3 py-1 font-mono text-[11px] uppercase tracking-wide text-ink/70">

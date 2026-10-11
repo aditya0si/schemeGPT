@@ -204,6 +204,20 @@ LangChain).
 and the stronger answer model (`GROQ_MODEL`) for final answers and the agentic
 loop. Every generation stays token-bounded.
 
+### 5.8 Cost ledger
+Every LLM call is also a money event. `app/pricing.py` holds a stdlib-only,
+network-free price table; `app/metrics.observe_tokens` accumulates USD cost
+alongside the existing per-model token buckets, and `GET /metrics` exposes it
+under `cost` (`total`, `by_model`, `per_request_avg`, `unpriced_calls`) without
+changing any pre-existing field. The two configured models are priced at Groq
+list rates per 1,000,000 tokens: `openai/gpt-oss-120b` at `$0.15` in / `$0.60`
+out and `openai/gpt-oss-20b` at `$0.075` in / `$0.30` out (verified
+2026-10-05; provenance is recorded on each entry's `source`). Unknown models are
+counted in `unpriced_calls` and recorded by `pricing.unpriced_models()`, never
+guessed at `$0.00`. The ledger deliberately over-reports: Groq's 50%
+prompt-cache discount and batch discount are not modelled, and all amounts are
+USD with no invented INR conversion.
+
 ---
 
 ## 6. Configuration reference

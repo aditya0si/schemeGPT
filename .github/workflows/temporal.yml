@@ -1,0 +1,83 @@
+name: Temporal (as-of) gate
+
+# Proof that the deterministic "answer as of a date" path can be regression-
+# tested offline: the answer is a pure function of the committed dated-claims
+# artifact, and the golden set is derived from that same artifact. This job
+# needs no provider credential, no database, and no network. GROQ_API_KEY is set
+# explicitly empty and no secret is referenced anywhere below.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/temporal.py"
+      - "app/temporal_answer.py"
+      - "eval/temporal_gate.py"
+      - "eval/fixtures/temporal_golden.jsonl"
+      - "eval/fixtures/temporal_claims.jsonl"
+      - "scripts/generate_temporal_golden.py"
+      - "scripts/extract_temporal_claims.py"
+      - "tests/test_temporal_gate.py"
+      - "tests/test_temporal_answer.py"
+      - "tests/test_temporal.py"
+      - "docs/versioning/**"
+      - ".github/workflows/temporal.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/temporal.py"
+      - "app/temporal_answer.py"
+      - "eval/temporal_gate.py"
+      - "eval/fixtures/temporal_golden.jsonl"
+      - "eval/fixtures/temporal_claims.jsonl"
+      - "scripts/generate_temporal_golden.py"
+      - "scripts/extract_temporal_claims.py"
+      - "tests/test_temporal_gate.py"
+      - "tests/test_temporal_answer.py"
+      - "tests/test_temporal.py"
+      - "docs/versioning/**"
+      - ".github/workflows/temporal.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  temporal-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No `pip install`: the gate and the generator are stdlib-only.
+      - name: Regenerate the golden set and assert byte-stability
+        run: |
+          cp eval/fixtures/temporal_golden.jsonl /tmp/temporal_golden.committed.jsonl
+          python scripts/generate_temporal_golden.py
+          diff -u /tmp/temporal_golden.committed.jsonl eval/fixtures/temporal_golden.jsonl
+
+      - name: Score the as-of path (empty key, no database, no network)
+        env:
+          GROQ_API_KEY: ""
+        run: >-
+          python -m eval.temporal_gate
+          --output eval/results/temporal_scores.json
+          --report eval/results/temporal_report.md
+
+      - name: Upload machine-readable results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporal-gate-${{ github.sha }}
+          path: |
+            eval/results/temporal_scores.json
+            eval/results/temporal_report.md
+          if-no-files-found: warn
+          retention-days: 30

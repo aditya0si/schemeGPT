@@ -1,0 +1,62 @@
+name: Offline generation snapshot
+
+# Proof of the phase's thesis: generation quality can be regression-tested
+# offline against an archived live-run capture, with no provider credential,
+# no database, and no network. The step below sets GROQ_API_KEY explicitly
+# empty, and no secrets are referenced anywhere in this workflow.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/quotes.py"
+      - "eval/**"
+      - "scripts/capture_generation_snapshot.py"
+      - "tests/test_offline_generation.py"
+      - "docs/evidence/**"
+      - ".github/workflows/offline-generation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/quotes.py"
+      - "eval/**"
+      - "scripts/capture_generation_snapshot.py"
+      - "tests/test_offline_generation.py"
+      - "docs/evidence/**"
+      - ".github/workflows/offline-generation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-generation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-generation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No `pip install`: the offline module and app.quotes are stdlib-only.
+      - name: Score the archived fixture (empty key, no database, no network)
+        env:
+          GROQ_API_KEY: ""
+        run: >-
+          python -m eval.offline_generation
+          --fixture eval/fixtures/generation_snapshot.jsonl
+          --output eval/results/generation_offline_scores.json
+
+      - name: Upload machine-readable results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-generation-${{ github.sha }}
+          path: eval/results/generation_offline_scores.json
+          if-no-files-found: warn
+          retention-days: 30

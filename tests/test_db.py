@@ -1,5 +1,7 @@
 """Database adapter compatibility tests."""
 
+import asyncio
+import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -135,3 +137,38 @@ def test_fetch_generation_jurisdictions_filters_by_generation(monkeypatch):
 def test_fetch_generation_jurisdictions_requires_generation():
     with pytest.raises(ValueError, match="corpus generation"):
         db.fetch_generation_jurisdictions("")
+
+
+# --- Windows event-loop policy contract for psycopg3 async -----------------
+
+
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows-only selector event-loop policy contract",
+)
+def test_import_installs_selector_event_loop_policy_on_windows():
+    assert isinstance(
+        asyncio.get_event_loop_policy(), asyncio.WindowsSelectorEventLoopPolicy
+    )
+
+
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows-only idempotency contract",
+)
+def test_selector_event_loop_policy_guard_is_idempotent():
+    before = asyncio.get_event_loop_policy()
+    db._ensure_windows_selector_event_loop_policy()
+    assert asyncio.get_event_loop_policy() is before
+    db._ensure_windows_selector_event_loop_policy()
+    assert asyncio.get_event_loop_policy() is before
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="non-Windows policy must be left untouched",
+)
+def test_selector_event_loop_policy_guard_is_noop_off_windows():
+    before = asyncio.get_event_loop_policy()
+    db._ensure_windows_selector_event_loop_policy()
+    assert asyncio.get_event_loop_policy() is before

@@ -17,9 +17,12 @@ Generates:
 
 A failure case is any case whose ``faithfulness`` or ``answer_relevancy``
 score is below FAILURE_THRESHOLD (0.70), or a case where the RAG pipeline or
-the model judge raised an error. If ``app.rag.answer`` falls back to demo mode
-(missing/invalid/rate-limited Groq call), the case is recorded as a pipeline
-error: it is never passed to the judge and never given faithfulness or
+the model judge raised an error. If ``app.rag.answer`` returns a non-live
+answer (demo or retrieval-only fallback), the case is recorded as a pipeline
+error with the *cause the provider actually reported*: a missing credential, a
+rejected credential, or a rate-limited/unavailable provider are three distinct
+reasons, and a rate-limited provider is never reported as a bad credential. The
+case is never passed to the judge and never given faithfulness or
 answer-relevancy scores, and it stays visible under Failure Cases. The
 threshold is a project triage threshold, not a universal quality claim.
 
@@ -66,15 +69,110 @@ GATE_FLOORS = {
 }
 GATE_METRICS = tuple(GATE_FLOORS)
 
-# Error recorded when app.rag.answer fell back to demo mode (a missing, invalid
-# or rate-limited Groq call returned a pre-made demo answer). Demo answers are
-# never scored by the judge and are reported as failure cases. The message is
-# deliberately safe and actionable; it never contains provider error details
-# or secrets.
-DEMO_FALLBACK_ERROR = (
-    "Live RAG returned demo fallback; provide a valid GROQ_API_KEY "
-    "before evaluating"
+# A non-live answer (demo or retrieval-only) is how app.rag.answer reports every
+# live-path failure. The harness exists to report *why* a case could not be
+# scored, so the reason is derived from the provider's own error class or
+# status code -- never assumed to be a bad credential. A missing key, a rejected
+# key, and a throttled/overloaded provider are three different conditions and
+# must read as three different reasons.
+FALLBACK_MODES = ("demo", "degraded")
+
+# Provider error identities that mean the credential itself was refused (the
+# Groq SDK raises AuthenticationError / PermissionDeniedError with 401/403).
+_AUTHENTICATION_ERROR_TYPES = frozenset(
+    {
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "UnauthorizedError",
+        "ForbiddenError",
+    }
 )
+_AUTHENTICATION_STATUS_CODES = frozenset({401, 403})
+_RATE_LIMIT_ERROR_TYPES = frozenset({"RateLimitError"})
+_RATE_LIMIT_STATUS_CODES = frozenset({429})
+_UNAVAILABLE_ERROR_TYPES = frozenset(
+    {
+        "APIConnectionError",
+        "APITimeoutError",
+        "InternalServerError",
+        "TimeoutError",
+        "ConnectionError",
+        "ConnectionResetError",
+        "ReadTimeout",
+        "RemoteProtocolError",
+    }
+)
+_UNAVAILABLE_STATUS_CODES = frozenset({408, 500, 502, 503, 504, 529})
+
+
+def _error_identity(error_type: str | None, status_code: int | None) -> str:
+    parts = [str(error_type)] if error_type else []
+    if status_code is not None:
+        parts.append(f"HTTP {status_code}")
+    return ", ".join(parts) if parts else "cause not recorded"
+
+
+def provider_failure_reason(
+    *,
+    configured: bool,
+    error_type: str | None = None,
+    status_code: int | None = None,
+) -> str:
+    """Classify a non-live fallback from the provider's own error facts.
+
+    Returns one of three distinct, credential-honest reasons:
+
+    * ``no credential configured`` -- the pipeline never had a key to use;
+    * ``credential rejected`` -- an authentication/authorization result;
+    * ``provider rate-limited`` / ``provider unavailable`` -- 429, 5xx, timeout
+      or connection failure.
+
+    Any other error is reported by its own class name. The reason is never
+    guessed to be a bad credential.
+    """
+    if not configured:
+        return "no credential configured (GROQ_API_KEY is empty)"
+    if (
+        error_type in _AUTHENTICATION_ERROR_TYPES
+        or status_code in _AUTHENTICATION_STATUS_CODES
+    ):
+        return f"credential rejected ({_error_identity(error_type, status_code)})"
+    if error_type in _RATE_LIMIT_ERROR_TYPES or status_code in _RATE_LIMIT_STATUS_CODES:
+        return f"provider rate-limited ({_error_identity(error_type, status_code)})"
+    if (
+        error_type in _UNAVAILABLE_ERROR_TYPES
+        or status_code in _UNAVAILABLE_STATUS_CODES
+        or (isinstance(status_code, int) and status_code >= 500)
+    ):
+        return f"provider unavailable ({_error_identity(error_type, status_code)})"
+    if error_type:
+        return f"provider failure ({error_type})"
+    return "cause not recorded (non-live fallback)"
+
+
+def fallback_error_message(mode: str, reason: str) -> str:
+    """Compose the per-case error text from a classified reason.
+
+    Only a missing or rejected credential yields credential advice. A
+    rate-limit or unavailability reason never tells the operator to change the
+    key, because the key was never the problem.
+    """
+    label = "demo fallback" if mode == "demo" else "retrieval-only fallback"
+    message = f"Live RAG returned {label}: {reason}."
+    if reason.startswith(("no credential", "credential rejected")):
+        return message + " Provide a valid GROQ_API_KEY before evaluating."
+    if reason.startswith(("provider rate-limited", "provider unavailable")):
+        return message + " Retry after the provider recovers."
+    return message
+
+
+def _result_failure_reason(result: dict, *, configured: bool) -> str:
+    return provider_failure_reason(
+        configured=configured,
+        error_type=result.get("provider_error_type"),
+        status_code=result.get("provider_status_code"),
+    )
+
 
 # The explicit judge returns four bounded metrics. Only answer-quality metrics
 # are gated; context metrics are reported for retrieval diagnosis.
@@ -154,16 +252,19 @@ def _run_pipeline(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     production path as the UI. Cases without these fields run as plain English
     questions, exactly as before.
 
-    A response in demo fallback mode (``mode == "demo"``: a missing, invalid
-    or rate-limited Groq call fell back to a pre-made answer) is treated as a
-    pipeline/evaluation error. The demo answer is not a live RAG result and is
+    A non-live response (``mode`` is ``"demo"`` or ``"degraded"``) is treated as
+    a pipeline/evaluation error. The answer is not a live RAG result and is
     never scored by the judge: the row keeps its error marker so ``run()``
     excludes it from the scored dataset while it stays visible under Failure
-    Cases in the report.
+    Cases in the report. The recorded reason distinguishes a missing credential,
+    a rejected credential, and a rate-limited/unavailable provider, using the
+    provider's own error class or status code carried on the result.
     """
+    from app.config import settings
     from app.rag import answer
     from app.schemas import ProfileData
 
+    configured = bool(settings.groq_api_key.strip())
     rows: list[dict[str, Any]] = []
     for item in questions:
         question = item["question"]
@@ -193,9 +294,11 @@ def _run_pipeline(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 # tokens). Back off once before giving up on the case.
                 time.sleep(RATE_LIMIT_BACKOFF_SECONDS)
                 result = answer(question, language=language, profile=profile)
-            if result.get("mode") == "demo":
+            if result.get("mode") in FALLBACK_MODES:
+                mode = str(result.get("mode"))
+                reason = _result_failure_reason(result, configured=configured)
                 row["answer"] = result.get("answer", "")
-                row["error"] = DEMO_FALLBACK_ERROR
+                row["error"] = fallback_error_message(mode, reason)
             else:
                 sources = result.get("sources", [])
                 row["answer"] = result.get("answer", "")
@@ -574,14 +677,16 @@ def run(limit: int | None = None, gate: bool = False, label: str | None = None) 
 
     ok_rows = [row for row in rows if row["error"] is None]
     if not ok_rows:
-        # Every case fell back to demo mode (missing/invalid/rate-limited Groq
-        # key, or an unreachable database). Fail clearly instead of publishing
-        # a report full of unscored demo fallbacks. No provider details leak.
+        # Every case failed. Fail clearly instead of publishing a report full
+        # of unscored fallbacks -- and name the candidate causes honestly rather
+        # than asserting a bad credential. Each row already carries the reason
+        # the provider reported (see provider_failure_reason).
         raise EvalError(
-            "All cases fell back to demo mode; the live RAG path produced no "
-            "answers. Evaluation requires a valid GROQ_API_KEY and a running, "
-            "ingested database (docker compose up -d db). Set GROQ_API_KEY in "
-            "your environment or .env, then re-run."
+            "All cases fell back to a non-live answer; the live RAG path "
+            "produced no answers. Check the provider credential (missing or "
+            "rejected?), provider availability (rate-limited or unreachable?), "
+            "and that the database is running and ingested "
+            "(docker compose up -d db), then re-run."
         )
     _score_rows(ok_rows)
 

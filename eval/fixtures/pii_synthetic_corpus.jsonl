@@ -1,0 +1,31 @@
+{"counts": {"aadhaar": 5, "devanagari_digits": 3, "gstin": 3, "ifsc": 2, "mobile": 6, "pan": 3, "upi": 3}, "generator": "scripts/generate_synthetic_pii_corpus.py", "labelled_spans": 25, "negative_records": 8, "records": 30, "seed": 20261005, "statement": "Entirely synthetic corpus generated from a seeded RNG; no real person's identifier is included.", "synthetic": true, "type": "header"}
+{"id": "en-aadhaar", "labels": [{"end": 33, "kind": "aadhaar", "start": 21, "text": "684621880111"}], "language": "en", "negative": false, "text": "My Aadhaar number is 684621880111 for the application."}
+{"id": "en-aadhaar-spaced", "labels": [{"end": 20, "kind": "aadhaar", "start": 8, "text": "684769630250"}], "language": "en", "negative": false, "text": "Aadhaar 684769630250 was linked to the account."}
+{"id": "en-pan", "labels": [{"end": 18, "kind": "pan", "start": 8, "text": "MLJMI4203Y"}], "language": "en", "negative": false, "text": "The PAN MLJMI4203Y is required for KYC."}
+{"id": "en-gstin", "labels": [{"end": 21, "kind": "gstin", "start": 6, "text": "24JTWYQ7302QPTE"}], "language": "en", "negative": false, "text": "GSTIN 24JTWYQ7302QPTE is printed on the tax invoice."}
+{"id": "en-ifsc", "labels": [{"end": 39, "kind": "ifsc", "start": 28, "text": "NZSK0LHI190"}], "language": "en", "negative": false, "text": "Transfer the amount to IFSC NZSK0LHI190 at the branch."}
+{"id": "en-upi", "labels": [{"end": 43, "kind": "upi", "start": 27, "text": "priya.sharma@ybl"}], "language": "en", "negative": false, "text": "Pay the application fee to priya.sharma@ybl before the deadline."}
+{"id": "en-mobile-prefixed", "labels": [{"end": 19, "kind": "mobile", "start": 5, "text": "+91 6061297812"}], "language": "en", "negative": false, "text": "Call +91 6061297812 for the helpline."}
+{"id": "en-mobile-bare", "labels": [{"end": 25, "kind": "mobile", "start": 15, "text": "6945944420"}], "language": "en", "negative": false, "text": "Send an SMS to 6945944420 to check the status."}
+{"id": "hi-Latn-aadhaar", "labels": [{"end": 25, "kind": "aadhaar", "start": 13, "text": "248504250379"}], "language": "hi-Latn", "negative": false, "text": "Mera Aadhaar 248504250379 hai, isko update karo."}
+{"id": "hi-Latn-pan", "labels": [{"end": 19, "kind": "pan", "start": 9, "text": "HGILJ9599V"}], "language": "hi-Latn", "negative": false, "text": "PAN card HGILJ9599V ka number form me daal do."}
+{"id": "hi-Latn-gstin", "labels": [{"end": 35, "kind": "gstin", "start": 20, "text": "90TDVNE4459GERS"}], "language": "hi-Latn", "negative": false, "text": "Dukaandaar ka GSTIN 90TDVNE4459GERS verify karo."}
+{"id": "hi-Latn-ifsc", "labels": [{"end": 16, "kind": "ifsc", "start": 5, "text": "ZTMU0PWR074"}], "language": "hi-Latn", "negative": false, "text": "IFSC ZTMU0PWR074 se paisa transfer hoga."}
+{"id": "hi-Latn-upi", "labels": [{"end": 27, "kind": "upi", "start": 6, "text": "9876543210@okhdfcbank"}], "language": "hi-Latn", "negative": false, "text": "Paisa 9876543210@okhdfcbank par bhej do."}
+{"id": "hi-Latn-mobile", "labels": [{"end": 22, "kind": "mobile", "start": 12, "text": "8376574513"}], "language": "hi-Latn", "negative": false, "text": "Apna mobile 8376574513 confirm karo."}
+{"id": "hi-Deva-aadhaar", "labels": [{"end": 24, "kind": "aadhaar", "start": 12, "text": "६२०४३५७४१६६३"}], "language": "hi-Deva", "negative": false, "text": "आधार संख्या ६२०४३५७४१६६३ दर्ज है।"}
+{"id": "hi-Deva-mobile", "labels": [{"end": 17, "kind": "mobile", "start": 7, "text": "८८७०८००८६१"}], "language": "hi-Deva", "negative": false, "text": "मोबाइल ८८७०८००८६१ पर संपर्क करें।"}
+{"id": "hi-Deva-ref-5", "labels": [{"end": 20, "kind": "devanagari_digits", "start": 15, "text": "८५७०७"}], "language": "hi-Deva", "negative": false, "text": "संदर्भ क्रमांक ८५७०७ उपलब्ध है।"}
+{"id": "hi-Deva-ref-6", "labels": [{"end": 14, "kind": "devanagari_digits", "start": 8, "text": "११५७६४"}], "language": "hi-Deva", "negative": false, "text": "पिन कोड ११५७६४ दर्ज है।"}
+{"id": "hi-Deva-ref-7", "labels": [{"end": 20, "kind": "devanagari_digits", "start": 13, "text": "५१७३८६७"}], "language": "hi-Deva", "negative": false, "text": "खाता क्रमांक ५१७३८६७ सक्रिय है।"}
+{"id": "en-aadhaar-mobile", "labels": [{"end": 20, "kind": "aadhaar", "start": 8, "text": "987829769509"}, {"end": 51, "kind": "mobile", "start": 41, "text": "6309413974"}], "language": "en", "negative": false, "text": "Aadhaar 987829769509 is linked to mobile 6309413974."}
+{"id": "en-gstin-pan", "labels": [{"end": 21, "kind": "gstin", "start": 6, "text": "67AIJLS3243DSPM"}, {"end": 47, "kind": "pan", "start": 37, "text": "SAURP3843F"}], "language": "en", "negative": false, "text": "GSTIN 67AIJLS3243DSPM references PAN SAURP3843F."}
+{"id": "hi-Latn-upi-mobile", "labels": [{"end": 21, "kind": "upi", "start": 4, "text": "field.ops@okicici"}, {"end": 41, "kind": "mobile", "start": 31, "text": "9084038603"}], "language": "hi-Latn", "negative": false, "text": "UPI field.ops@okicici ya phone 9084038603 use karo."}
+{"id": "neg-aadhaar-verhoeff", "labels": [], "language": "en", "negative": true, "text": "The number 207170348762 looks like Aadhaar but the checksum fails."}
+{"id": "neg-pan-malformed", "labels": [], "language": "en", "negative": true, "text": "Reference GNXZ3189X is not a valid PAN."}
+{"id": "neg-non-mobile-zero", "labels": [], "language": "en", "negative": true, "text": "Account 0252055877 is a ledger number, not a phone."}
+{"id": "neg-non-mobile-five", "labels": [], "language": "hi-Latn", "negative": true, "text": "Code 0181391564 mobile number nahi hai."}
+{"id": "neg-high-entropy", "labels": [], "language": "en", "negative": true, "text": "Session token C6D4K4M3J5I1X was generated."}
+{"id": "neg-aadhaar-in-run", "labels": [], "language": "en", "negative": true, "text": "94330834678509 is part of a longer identifier run."}
+{"id": "neg-eleven-digit", "labels": [], "language": "en", "negative": true, "text": "Reference 77679627371 is an eleven-digit code."}
+{"id": "neg-email", "labels": [], "language": "en", "negative": true, "text": "Write to field.ops@example.com for support."}

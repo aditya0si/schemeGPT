@@ -49,6 +49,36 @@ jobs:
         run: python -m pip_audit
       - name: Run tests (no DB, no Groq, no model downloads)
         run: python -m pytest -q
+      - name: Check published claims (README counts vs repository)
+        run: python tools/check_claims.py
+
+  field:
+    name: Field kit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # These scripts execute on a customer's host, where a syntax error is a
+      # failed install in front of them. Parse-check every one on CI.
+      - name: Shell syntax check
+        run: |
+          set -e
+          for script in deploy/field/*.sh; do bash -n "$script" && echo "syntax ok: $script"; done
+      - name: Python syntax check (stdlib-only kit)
+        run: python -m py_compile deploy/field/preflight.py deploy/field/stub_provider.py deploy/field/drill.py
+      - name: Host preflight must report no blockers
+        run: |
+          cp .env.example .env
+          set +e
+          python deploy/field/preflight.py --repo-root . --airgap --label ci --json /tmp/preflight.json
+          rc=$?
+          set -e
+          echo "preflight exit code: $rc (0 = go, 1 = blockers, 2 = warnings)"
+          python -c "import json,pathlib; r=json.loads(pathlib.Path('/tmp/preflight.json').read_text()); print('verdict:', r['verdict'], r['counts']); assert r['exit_code'] != 1, [f['code'] for f in r['findings'] if f['severity'] == 'BLOCKER']"
+      - name: Drill plan parses
+        run: python deploy/field/drill.py --phases A,B,C,D,E,F,G --dry-run
 
   web:
     name: Web build and security audit

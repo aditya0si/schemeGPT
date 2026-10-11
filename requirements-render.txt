@@ -1,0 +1,35 @@
+# Free-tier API image dependencies (Render free instance: 512 MB RAM, 0.1 CPU).
+#
+# Same application dependencies as requirements.txt with one deliberate
+# substitution: the embedding model runs on ONNX Runtime (fastembed) instead of
+# PyTorch. torch plus the fp32 multilingual-e5-small checkpoint needs ~1-2 GB
+# resident, which a 512 MB instance does not have, and installing torch also
+# costs ~200 MB of image for a dependency this image never uses.
+#
+# Select the backend with EMBEDDING_BACKEND=fastembed (see app/config.py) and
+# embed the corpus with the SAME backend — the two runtimes are numerically
+# close but not bit-identical, so a corpus embedded with torch and queried
+# through ONNX would be scored in a slightly different vector space.
+#
+# The cross-encoder reranker (BAAI/bge-reranker-base, ~2 GB) is not installable
+# here: keep ENABLE_RERANKER=false, which is the default.
+fastapi==0.141.1
+uvicorn==0.52.4
+
+langchain-core==1.6.3
+langchain-text-splitters==1.1.2
+langchain-groq==1.1.3
+langchain-postgres==0.0.17
+
+fastembed==0.9.0
+psycopg[binary]==3.3.5
+sqlalchemy==2.0.52
+python-dotenv==1.2.3
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+
+# OpenTelemetry tracing (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-fastapi==0.65b0

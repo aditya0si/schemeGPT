@@ -1,0 +1,15 @@
+# Shell scripts are executed on the customer's Linux host. A CRLF checkout of
+# these files fails there with "bad interpreter: /usr/bin/env bash^M", so their
+# line endings are pinned regardless of anyone's core.autocrlf setting.
+*.sh text eol=lf
+*.py text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+Makefile text eol=lf
+
+# Triggered GitHub Actions workflow files:
+.github/workflows/*.yml text eol=lf
+
+# Viewers and generated HTML: keep them out of language stats so the repository
+# reports Python/TypeScript, not HTML.
+*.html linguist-detectable=false

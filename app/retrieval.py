@@ -19,6 +19,7 @@ import time or in tests.
 
 import hashlib
 import logging
+import os
 import re
 from functools import lru_cache
 
@@ -87,22 +88,99 @@ def rrf_fuse(
     return [entry["doc"] for entry in ranked]
 
 
-def _select_diverse(docs: list[Document], final_k: int) -> list[Document]:
-    """Keep the first chunk per metadata ``source`` so the top-k are distinct docs.
+# Provenance trust classes, best first. The corpus records one of three
+# ``data_status`` values; anything else (including a missing key on an older
+# vector) ranks last as "unknown".
+_TRUST_ORDER = {
+    "sample_verified": 0,
+    "myscheme_import": 1,
+    "directory_seed": 2,
+}
+_UNKNOWN_TRUST = len(_TRUST_ORDER)
 
-    Near-duplicate myScheme imports can otherwise fill every slot with chunks
-    of the same file; capping each source to one entry preserves the fused rank
-    order while widening provenance coverage.
+# Auto-imported myScheme files append an integer duplicate suffix when a source
+# name collides (only ``(1)`` occurs in the corpus). A trailing ``(N)`` is
+# therefore treated as a duplicate marker, not part of the document identity.
+_DUPLICATE_SUFFIX_RE = re.compile(r"\(\d+\)$")
+
+
+def _logical_document_key(source: object) -> str | None:
+    """Identity shared by copies of one logical document.
+
+    The key is the source *basename* (directory stripped), lowercased, with the
+    extension removed and a trailing ``(N)`` duplicate suffix stripped. So
+    ``schemes/pm-kisan.md`` and ``myscheme/pm-kisan.md`` share ``pm-kisan``,
+    while genuinely different schemes keep distinct keys.
+
+    Two deliberate, documented consequences of a basename-only key:
+
+    * Two different directories holding different documents with the same
+      basename collapse into one group and keep only the representative. This is
+      exactly what recovers the verified/auto-imported PM-KISAN pair, and is
+      accepted for any other same-basename pair; the trust rule decides which
+      copy survives.
+    * A *legitimate* trailing numeric parenthetical (e.g. ``report(2024).md``)
+      is indistinguishable from a duplicate marker and is stripped too. Every
+      parenthetical filename in this corpus is a ``(1)`` duplicate, so the rule
+      matches the real naming convention; ``(N)`` rather than ``(1)`` keeps it
+      general without special-casing a single integer.
+
+    ``None``/empty source yields ``None``: such docs are never grouped together
+    (each is its own document), preserving the old unlabelled behaviour.
     """
+    if source is None:
+        return None
+    name = str(source).replace("\\", "/").rsplit("/", 1)[-1]
+    stem = os.path.splitext(name)[0]
+    key = _DUPLICATE_SUFFIX_RE.sub("", stem).casefold()
+    return key or None
+
+
+def _trust_rank(doc: Document) -> int:
+    """Lower is better: sample_verified < myscheme_import < directory_seed < unknown."""
+    return _TRUST_ORDER.get(doc.metadata.get("data_status"), _UNKNOWN_TRUST)
+
+
+def _select_diverse(docs: list[Document], final_k: int) -> list[Document]:
+    """Keep one chunk per *logical document* so the top-k are distinct docs.
+
+    Near-duplicate myScheme imports can otherwise fill every slot with chunks of
+    the same file, and the same scheme can be indexed twice (a hand-verified
+    ``schemes/`` copy and an auto-imported ``myscheme/`` copy). Grouping by
+    :func:`_logical_document_key` and emitting a single representative per group
+    preserves the fused rank order while widening provenance coverage.
+
+    A group with more than one member is represented by its highest-trust member
+    (:func:`_trust_rank`); ties break on the already-deterministic fused rank
+    (the better-ranked member wins). The group occupies the position of its
+    best-ranked member, so a verified copy pulled in by the lexical channel can
+    take the slot an auto-imported duplicate would otherwise have held.
+
+    Determinism: the output is a pure function of the ranked input. Groups are
+    emitted in first-encounter order and the representative is chosen by an
+    explicit ``(trust, fused_position)`` sort, never by set/dict iteration order
+    or the incidental order of the duplicate rows.
+    """
+    members: dict[object, list[tuple[int, Document]]] = {}
+    group_order: list[object] = []
+    unlabelled = 0
+    for position, doc in enumerate(docs):
+        key: object = _logical_document_key(doc.metadata.get("source"))
+        if key is None:
+            # Distinct sentinel per doc: unlabelled docs are never collapsed.
+            key = ("\x00unlabelled", unlabelled)
+            unlabelled += 1
+        if key not in members:
+            members[key] = []
+            group_order.append(key)
+        members[key].append((position, doc))
+
     selected: list[Document] = []
-    seen: set[object] = set()
-    for doc in docs:
-        source = doc.metadata.get("source")
-        if source is not None:
-            if source in seen:
-                continue
-            seen.add(source)
-        selected.append(doc)
+    for key in group_order:
+        _position, representative = min(
+            members[key], key=lambda item: (_trust_rank(item[1]), item[0])
+        )
+        selected.append(representative)
         if len(selected) >= final_k:
             break
     return selected
@@ -210,10 +288,13 @@ def _generation_sources(corpus_generation: str | None) -> tuple[str, ...]:
         params["generation"] = corpus_generation
     with get_engine().connect() as conn:
         rows = conn.execute(
-            text(f"SELECT DISTINCT {source_expr} FROM {VECTOR_TABLE} WHERE {where}"),
+            text(
+                f"SELECT DISTINCT {source_expr} FROM {VECTOR_TABLE} WHERE {where} "
+                f"ORDER BY {source_expr}"
+            ),
             params,
         ).fetchall()
-    return tuple(str(row[0]) for row in rows if row[0])
+    return tuple(sorted(str(row[0]) for row in rows if row[0]))
 
 
 def _fetch_source_chunks(
@@ -232,7 +313,9 @@ def _fetch_source_chunks(
         return conn.execute(
             text(
                 f"SELECT content, {VECTOR_METADATA_COLUMN} "
-                f"FROM {VECTOR_TABLE} WHERE {where}"
+                f"FROM {VECTOR_TABLE} WHERE {where} "
+                f"ORDER BY {VECTOR_METADATA_COLUMN} ->> 'source', "
+                f"{VECTOR_METADATA_COLUMN} ->> 'chunk_index', content"
             ),
             params,
         ).fetchall()
@@ -280,25 +363,28 @@ def _lexical_search(
         )
         return []
 
-    ranked: list[tuple[int, int, int, Document, int]] = []
-    for order, row in enumerate(rows):
+    ranked: list[tuple[tuple, Document, int]] = []
+    for row in rows:
         content = row[0]
         metadata = row[1] or {}
         hits = _content_token_hits(content, tokens)
-        ranked.append(
-            (
-                -hits,
-                _chunk_index(metadata),
-                order,
-                Document(page_content=content, metadata=metadata),
-                hits,
-            )
+        doc = Document(page_content=content, metadata=metadata)
+        # The sort key must depend only on the row's data, never on the order
+        # Postgres happened to return rows in (which is unspecified absent an
+        # ORDER BY). ``source`` and the content hash are stable identifiers, so
+        # the ranked output is reproducible across plans.
+        key = (
+            -hits,
+            _chunk_index(metadata),
+            str(metadata.get("source") or ""),
+            _doc_id(doc),
         )
-    ranked.sort(key=lambda item: (item[0], item[1], item[2]))
+        ranked.append((key, doc, hits))
+    ranked.sort(key=lambda item: item[0])
 
     results: list[tuple[Document, float]] = []
     seen: set[object] = set()
-    for _neg_hits, _index, _order, doc, hits in ranked:
+    for _key, doc, hits in ranked:
         source = doc.metadata.get("source")
         if source in seen:
             continue
