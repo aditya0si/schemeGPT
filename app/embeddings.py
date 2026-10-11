@@ -96,10 +96,13 @@ class FastEmbedEmbeddings(Embeddings):
     """The same E5 model through ONNX Runtime, with no PyTorch dependency.
 
     The fp32 ``sentence-transformers`` stack plus the 470 MB checkpoint needs
-    ~1-2 GB of resident memory; ONNX Runtime streams the same weights into a
-    small process instead, which is what lets the API run on a 512 MB free
-    instance. Imported lazily so a deployment that selects this backend never
-    pays for torch at import time.
+    ~1-2 GB of resident memory; ONNX Runtime drops the torch dependency and runs
+    a much smaller process, which is what makes a free-tier instance viable at
+    all. Necessary, not sufficient: the fp32 ONNX graph alone still cost about
+    its own file size in resident memory and got a 512 MiB instance OOM-killed
+    on the first query that needed it, which is why ``EMBEDDING_MODEL_FILE``
+    exists and the deployed image selects the int8 graph. Imported lazily so a
+    deployment that selects this backend never pays for torch at import time.
     """
 
     def __init__(self, model_name: str = EMBEDDING_MODEL_NAME) -> None:
@@ -129,9 +132,19 @@ def build_embeddings(model_name: str, backend: str = "sentence_transformers") ->
 
     ``backend="fastembed"`` avoids importing ``langchain_huggingface`` at all,
     so the ONNX deployment never drags PyTorch into the image or the process.
+    ``backend="remote"`` asks a hosted endpoint (see ``RemoteEmbeddings``) and
+    loads no model locally at all.
     """
     inner: Embeddings
-    if backend == "fastembed":
+    if backend == "remote":
+        from app.config import settings
+
+        inner = RemoteEmbeddings(
+            model_name,
+            api_url=settings.embedding_api_url,
+            api_key=settings.embedding_api_key,
+        )
+    elif backend == "fastembed":
         inner = FastEmbedEmbeddings(model_name)
     else:
         from langchain_huggingface import HuggingFaceEmbeddings
@@ -140,3 +153,83 @@ def build_embeddings(model_name: str, backend: str = "sentence_transformers") ->
     if needs_e5_prefixes(model_name):
         return E5PrefixEmbeddings(inner)
     return inner
+
+
+class RemoteEmbeddings(Embeddings):
+    """E5 embeddings from a hosted inference endpoint, with no local model.
+
+    Why this exists: the free-tier container cannot hold the model in-process.
+    Measured in a real 512 MiB cgroup (limit 536.9 MB) the tokenizer alone costs
+    ~300 MB, the int8 ONNX session ~200 MB, and the app's own baseline ~98 MB, so
+    the first query is OOM-killed whatever graph is used — fastembed, a lean
+    ONNX session and a tuned session all peak at 520-563 MB before the app's
+    share. A hosted endpoint that serves the SAME model keeps the corpus and the
+    published gate numbers valid; the E5 prefixes are applied by the wrapper
+    around this class, exactly as for the local backends.
+
+    Fails closed: an endpoint that answers with token-level output or a vector
+    whose width is not the model's would put queries in a different space than
+    the stored corpus, so both are refused loudly rather than silently used.
+    """
+
+    def __init__(
+        self,
+        model_name: str = EMBEDDING_MODEL_NAME,
+        api_url: str = "",
+        api_key: str = "",
+        timeout_s: float = 60.0,
+        batch_size: int = 16,
+    ) -> None:
+        if not api_url:
+            raise ValueError(
+                "EMBEDDING_API_URL is empty: the remote backend needs a hosted "
+                "embedding endpoint. Set it, or choose another EMBEDDING_BACKEND."
+            )
+        self.model_name = model_name
+        self.api_url = api_url
+        self.api_key = api_key
+        self.timeout_s = timeout_s
+        self.batch_size = batch_size
+        self.dim = _FASTEMBED_CUSTOM_DIMS.get(model_name.rsplit("/", 1)[-1])
+
+    def _post(self, texts: list[str]) -> list[list[float]]:
+        import json
+        import urllib.request
+
+        body = json.dumps({"inputs": texts, "options": {"wait_for_model": True}}).encode()
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        request = urllib.request.Request(self.api_url, data=body, method="POST", headers=headers)
+        with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+            payload = json.loads(response.read())
+
+        if not isinstance(payload, list) or not payload:
+            raise ValueError(f"Embedding endpoint returned {type(payload).__name__}, not a list of vectors.")
+        if isinstance(payload[0], list) and payload[0] and isinstance(payload[0][0], list):
+            raise ValueError(
+                "Embedding endpoint returned token-level output; this backend needs "
+                "sentence-level vectors (mean-pooled and normalized) to match the corpus."
+            )
+        vectors = [[float(value) for value in vector] for vector in payload]
+        if len(vectors) != len(texts):
+            raise ValueError(
+                f"Embedding endpoint returned {len(vectors)} vectors for {len(texts)} inputs."
+            )
+        if self.dim is not None:
+            widths = {len(vector) for vector in vectors}
+            if widths != {self.dim}:
+                raise ValueError(
+                    f"Embedding endpoint returned width(s) {sorted(widths)} but {self.model_name} "
+                    f"is {self.dim}-dimensional; the stored corpus would not be comparable."
+                )
+        return vectors
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), self.batch_size):
+            vectors.extend(self._post(texts[start : start + self.batch_size]))
+        return vectors
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._post([text])[0]

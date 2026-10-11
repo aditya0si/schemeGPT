@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # numerically close but not bit-identical, so mixing them would put the
     # query in a slightly different vector space than the stored rows.
     embedding_backend: str = "sentence_transformers"
+    # Hosted embedding endpoint for backend="remote". The free-tier container
+    # cannot hold the model (tokenizer ~300 MB + int8 ONNX session ~200 MB against
+    # a 536.9 MB cgroup limit, with ~98 MB of app), so the deployed API can ask a
+    # hosted endpoint that serves the SAME model for query vectors instead. Empty
+    # means the model runs in-process, as before.
+    embedding_api_url: str = ""
+    embedding_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
     # Small, fast model for cheap sub-tasks (normalization, routing).
     groq_fast_model: str = "openai/gpt-oss-20b"
