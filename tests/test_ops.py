@@ -313,11 +313,34 @@ PM_KISAN = (
 )
 
 
+# The corpus generation these fixtures bind. Reading it for real dialled the
+# default Postgres DSN from a unit test (`rag.answer` -> `capture_generation` ->
+# `db.read_corpus_generation` -> `engine.connect()`), which on a host that drops
+# loopback connects rather than refusing them blocked the suite for minutes.
+# A fixture constant keeps this file's tests database-free; the guard in
+# `tests/conftest.py` fails any test that reaches the driver instead.
+FIXTURE_GENERATION = "gen-tests"
+
+
 @pytest.fixture
 def degraded_setup(monkeypatch, tmp_path):
-    """Wire a fake retriever + a controller whose AI switch is off."""
+    """Wire a fake retriever + a controller whose AI switch is off.
+
+    The corpus generation is *bound*, not read: the generation-binding contract
+    only requires every cache decision in one request to see the same value, and
+    these tests are about the operator gate, not about where the value comes
+    from. Stubbing the two module-level seams (rather than `app.db`, which
+    `app.semantic_cache` resolved at import time) is what actually prevents the
+    connect.
+    """
     from app import rag
 
+    monkeypatch.setattr(
+        rag.semantic_cache, "capture_generation", lambda: FIXTURE_GENERATION
+    )
+    monkeypatch.setattr(
+        rag.semantic_cache, "read_corpus_generation", lambda: FIXTURE_GENERATION
+    )
     controller = OpsController(state_path=tmp_path / "ops.json")
     monkeypatch.setattr(rag, "operator", controller)
     monkeypatch.setattr(rag, "get_retriever", lambda: FakeRetriever(
@@ -330,6 +353,14 @@ def degraded_setup(monkeypatch, tmp_path):
     )
     controller.disable_ai(reason="test", actor="pytest")
     return rag, controller
+
+
+def test_degraded_setup_binds_a_generation_instead_of_reading_one(degraded_setup):
+    """Both seams answer from the fixture; no connection is in the path."""
+    rag, _controller = degraded_setup
+
+    assert rag.semantic_cache.capture_generation() == FIXTURE_GENERATION
+    assert rag.semantic_cache.read_corpus_generation() == FIXTURE_GENERATION
 
 
 def test_degraded_answer_quotes_are_verbatim_and_verified(degraded_setup):
