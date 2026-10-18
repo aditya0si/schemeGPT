@@ -39,7 +39,13 @@ def test_lookup_swallows_engine_errors(monkeypatch):
             raise RuntimeError("db down")
 
     monkeypatch.setattr(semantic_cache, "get_engine", lambda: Boom())
-    result = semantic_cache.lookup("q", "en", "none")
+    # An explicit generation keeps this test on its stated subject. With the
+    # sentinel the cache reads the active generation from the database *first*
+    # (app/semantic_cache.py), which is a live connect rather than the injected
+    # engine failure -- and on a host that drops loopback connections instead of
+    # refusing them it blocked the run instead of failing. See the live-database
+    # guard in tests/conftest.py.
+    result = semantic_cache.lookup("q", "en", "none", "gen-tests")
     assert result is None
     with metrics._lock:
         assert metrics._counters.get("cache_error", 0) >= 1
@@ -51,7 +57,7 @@ def test_store_swallows_engine_errors(monkeypatch):
             raise RuntimeError("db down")
 
     monkeypatch.setattr(semantic_cache, "get_engine", lambda: Boom())
-    semantic_cache.store("q", "en", "none", {"answer": "x"})
+    semantic_cache.store("q", "en", "none", {"answer": "x"}, "gen-tests")
     with metrics._lock:
         assert metrics._counters.get("cache_error", 0) >= 1
 
