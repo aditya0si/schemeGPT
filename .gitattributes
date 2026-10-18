@@ -10,6 +10,14 @@ Makefile text eol=lf
 # Triggered GitHub Actions workflow files:
 .github/workflows/*.yml text eol=lf
 
+# Generated JSONL fixtures are derived artifacts: a test asserts each one is
+# LF-only and that a fresh derivation reproduces it byte-for-byte. The committed
+# bytes are LF, but a core.autocrlf=true checkout hands a Windows working tree
+# CRLF, which failed four temporal tests here while Linux CI stayed green. Pin
+# them the same way the shell scripts are pinned, so the checkout cannot change
+# bytes the tests compare.
+eval/fixtures/*.jsonl text eol=lf
+
 # Viewers and generated HTML: keep them out of language stats so the repository
 # reports Python/TypeScript, not HTML.
 *.html linguist-detectable=false
