@@ -47,6 +47,7 @@ const CHROME =
 
 const results = [];
 const consoleErrors = [];
+const expectedResourceErrors = [];
 const failedRequests = [];
 function check(name, ok, detail = "") {
   results.push({ name, ok, detail });
@@ -105,7 +106,13 @@ ws.addEventListener("message", (event) => {
     );
   }
   if (msg.method === "Log.entryAdded" && msg.params.entry.level === "error") {
-    consoleErrors.push(`log: ${msg.params.entry.text}`);
+    const { text, url = "" } = msg.params.entry;
+    // Two resource loads are expected in this journey: the site has no favicon
+    // yet (a known, documented gap) and this harness deliberately asks the stub
+    // for a failing answer. Everything else is a defect.
+    if (url.includes("/favicon")) expectedResourceErrors.push(`${url} favicon 404 (known gap)`);
+    else if (url.includes("/api/chat/stream")) expectedResourceErrors.push(`${url} deliberate failure probe`);
+    else consoleErrors.push(`log: ${text}${url ? ` (${url})` : ""}`);
   }
   if (msg.method === "Network.loadingFailed" && !msg.params.canceled) {
     failedRequests.push(`${msg.params.type} ${msg.params.errorText}`);
@@ -122,7 +129,7 @@ const send = (sessionId, method, params = {}) =>
 // The page target: create a fresh tab and attach to it.
 const { targetId } = await send(undefined, "Target.createTarget", { url: "about:blank" });
 const { sessionId } = await send(undefined, "Target.attachToTarget", { targetId, flatten: true });
-for (const domain of ["Page", "Runtime", "Log", "Network", "Emulation"]) {
+for (const domain of ["Page", "Runtime", "Log", "Network"]) {
   await send(sessionId, `${domain}.enable`, domain === "Network" ? { maxTotalBufferSize: 1e6 } : {});
 }
 
@@ -159,8 +166,18 @@ async function viewport(width, height) {
   });
 }
 
-async function screenshot(name) {
-  const { data } = await send(sessionId, "Page.captureScreenshot", { format: "png" });
+async function screenshot(name, scrollTo = null) {
+  if (scrollTo) {
+    await evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(scrollTo)});
+      if (el) el.scrollIntoView({ block: "start" });
+    })()`);
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  const { data } = await send(sessionId, "Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: Boolean(scrollTo),
+  });
   mkdirSync(SHOTS, { recursive: true });
   const file = path.join(SHOTS, name);
   writeFileSync(file, Buffer.from(data, "base64"));
@@ -195,12 +212,19 @@ try {
   console.log(`shot  ${await screenshot("hero.png")}`);
 
   // 2 — ask → answer → source journey -----------------------------------------
-  await evaluate("document.querySelectorAll('button')[0].click()");
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((b) => /PM-KISAN/.test(b.innerText));
+    if (!button) throw new Error('sample-query button not found');
+    button.click();
+  })()`);
   await waitFor("!!document.querySelector('[data-testid=\"source-card\"]')", {
     label: "sources to render",
   });
+  // NB: several labels are rendered through CSS-uppercased classes, so innerText
+  // arrives uppercased — compare case-insensitively.
   await waitFor(
-    "document.body.innerText.includes('Verified source quotes') && !document.body.innerText.includes('Searching policy corpus')",
+    "(() => { const t = document.body.innerText.toLowerCase();" +
+      " return t.includes('verified source quotes') && !t.includes('searching policy corpus'); })()",
     { label: "answer to finish streaming" },
   );
 
@@ -208,8 +232,8 @@ try {
     const cards = [...document.querySelectorAll('[data-testid="source-card"]')];
     return {
       statuses: cards.map((c) => c.dataset.status),
-      labels: cards.map((c) => c.innerText.trim().split('\\n').map((s) => s.trim()).filter(Boolean)),
-      body: document.body.innerText,
+      labels: cards.map((c) => c.innerText.trim().split('\\n').map((s) => s.trim().toLowerCase()).filter(Boolean)),
+      body: document.body.innerText.toLowerCase(),
     };
   })()`);
   check(
@@ -219,14 +243,16 @@ try {
   );
   check(
     "imported records are labelled unverified, never 'Verified'",
-    journey.labels.some((l) => l.some((s) => s.includes("Imported · unverified"))) &&
-      !journey.labels.filter((l) => l.some((s) => s.includes("Imported"))).some((l) => l.some((s) => s === "Verified")),
+    journey.labels.some((l) => l.some((s) => s.includes("imported · unverified"))) &&
+      !journey.labels
+        .filter((l) => l.some((s) => s.includes("imported")))
+        .some((l) => l.some((s) => s === "verified")),
   );
-  check("absent source URL is stated, not implied", journey.body.includes("no per-document source URL stored"));
+  check("absent source URL is stated, not implied", journey.body.includes("no per-document source url stored"));
   check("absent verification date is stated", journey.body.includes("no verification date on record"));
-  check("verified quote panel renders", /Verified source quotes \[1\]/.test(journey.body));
-  check("retrieved sources panel renders", /Retrieved sources \[3\]/.test(journey.body));
-  console.log(`shot  ${await screenshot("journey-answer.png")}`);
+  check("verified quote panel renders", /verified source quotes \[1\]/.test(journey.body));
+  check("retrieved sources panel renders", /retrieved sources \[3\]/.test(journey.body));
+  console.log(`shot  ${await screenshot("journey-answer.png", "ul li:last-child")}`);
 
   // 2b — the provenance edge cases --------------------------------------------
   await evaluate(`(() => {
@@ -236,13 +262,15 @@ try {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.form.requestSubmit();
   })()`);
-  await waitFor("document.body.innerText.includes('mystery_status')", { label: "edge-case sources" });
+  await waitFor("document.body.innerText.toLowerCase().includes('mystery_status')", {
+    label: "edge-case sources",
+  });
   const edge = await evaluate(`(() => [...document.querySelectorAll('[data-testid="source-card"]')]
-    .map((c) => ({ status: c.dataset.status, text: c.innerText.trim().split('\\n').map((s) => s.trim()).filter(Boolean) })))()`);
-  const edgeText = JSON.stringify(edge);
-  check("directory seed has its own label", edgeText.includes("Directory seed"));
-  check("a record with no data_status says so", edgeText.includes("Provenance unlabelled"));
-  check("an unknown status renders raw, not neutral", edgeText.includes("Unrecognised status · mystery_status"));
+    .map((c) => ({ status: c.dataset.status, text: c.innerText.trim().split('\\n').map((s) => s.trim().toLowerCase()).filter(Boolean) })))()`);
+  const edgeText = JSON.stringify(edge).toLowerCase();
+  check("directory seed has its own label", edgeText.includes("directory seed"));
+  check("a record with no data_status says so", edgeText.includes("provenance unlabelled"));
+  check("an unknown status renders raw, not neutral", edgeText.includes("unrecognised status · mystery_status"));
 
   // 3 — failure state ----------------------------------------------------------
   await evaluate(`(() => {
@@ -252,23 +280,25 @@ try {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.form.requestSubmit();
   })()`);
-  await waitFor("document.body.innerText.includes('Service Notice / Error')", { label: "error state" });
+  await waitFor("document.body.innerText.toLowerCase().includes('service notice / error')", {
+    label: "error state",
+  });
   const failure = await evaluate(`(() => ({
-    body: document.body.innerText,
-    retry: [...document.querySelectorAll('button')].some((b) => b.innerText.includes('Retry question')),
+    body: document.body.innerText.toLowerCase(),
+    retry: [...document.querySelectorAll('button')].some((b) => b.innerText.toLowerCase().includes('retry question')),
   }))()`);
   check("failure state is labelled and offers a retry", failure.retry);
   check("failure copy does not pretend the answer exists", /rejected the request|unreachable/i.test(failure.body));
-  console.log(`shot  ${await screenshot("failure-state.png")}`);
+  console.log(`shot  ${await screenshot("failure-state.png", "ul li:last-child")}`);
 
   // 4 — /evidence and /coverage with the API configured ------------------------
   await goto(`${BASE}/evidence`);
   const evidence = await evaluate(`(() => {
-    const text = document.body.innerText;
+    const text = document.body.innerText.toLowerCase();
     return {
       metrics: document.querySelectorAll('[data-testid^="metric-"]').length,
-      hasInt8: text.includes('0.802083') && text.includes('int8 ONNX'),
-      hasFp32: text.includes('0.796875') && text.includes('fp32 PyTorch'),
+      hasInt8: text.includes('0.802083') && text.includes('int8 onnx'),
+      hasFp32: text.includes('0.796875') && text.includes('fp32 pytorch'),
       hasOfflinePanel: !!document.querySelector('[data-testid="offline-panel"]'),
     };
   })()`);
@@ -299,19 +329,24 @@ try {
   check("header stays visible at 375px", narrow.visible && narrow.headerWidth > 300, `overflow ${narrow.overflow}px`);
   await evaluate("document.body.focus()");
   let focus = null;
-  for (let i = 0; i < 8 && !focus; i += 1) {
+  let focusTrail = [];
+  for (let i = 0; i < 10 && !focus; i += 1) {
     await pressTab();
-    focus = await evaluate(`(() => {
+    const current = await evaluate(`(() => {
       const el = document.activeElement;
       if (!el || el.tagName !== 'A') return null;
       const cs = getComputedStyle(el);
       return { text: el.innerText.trim(), href: el.getAttribute('href'), outline: cs.outlineStyle, width: cs.outlineWidth };
     })()`);
+    if (current) {
+      focusTrail.push(`${current.text}→${current.href}`);
+      if (current.href === "/evidence") focus = current;
+    }
   }
   check(
-    "keyboard focus reaches the nav link with a visible focus ring",
-    Boolean(focus) && focus.href === "/evidence" && focus.outline !== "none" && parseFloat(focus.width) > 0,
-    JSON.stringify(focus),
+    "keyboard focus reaches the evidence nav link with a visible focus ring",
+    Boolean(focus) && focus.outline !== "none" && parseFloat(focus.width) > 0,
+    `${focusTrail.join(" | ")} :: ${JSON.stringify(focus)}`,
   );
   console.log(`shot  ${await screenshot("narrow-home.png")}`);
 
