@@ -11,6 +11,9 @@
  *
  *   Retrieval gate    docs/evidence/RETRIEVAL-GATE.md
  *                     python -m eval.retrieval_gate
+ *                     Two runtimes are published for the same gate and the same
+ *                     floors; every published value carries the runtime label
+ *                     that produced it (see "The two published MRR@4 values").
  *   Temporal gate     docs/evidence/TEMPORAL-GATE.md
  *                     ./.venv/Scripts/python.exe -m eval.temporal_gate --check-default-mode
  *   PII benchmark     docs/evidence/PII-BENCHMARK.md
@@ -24,7 +27,14 @@
 export const RETRIEVAL = {
   casesCompleted: "16/16",
   hitAt4: "0.875",
+  // One gate, two measured runtimes. Both values are real measurements of the
+  // same 16 cases on the same corpus generation against the same, unchanged
+  // floors; they differ only in which encoder embedded the query. Neither value
+  // may ever be shown without its runtime label.
   mrrAt4: "0.796875",
+  mrrAt4Runtime: "fp32 PyTorch (local)",
+  mrrAt4Int8: "0.802083",
+  mrrAt4Int8Runtime: "int8 ONNX (hosted image)",
   hitAt4Floor: "0.85",
   mrrAt4Floor: "0.60",
 } as const;

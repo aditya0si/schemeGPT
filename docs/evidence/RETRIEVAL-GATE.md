@@ -16,6 +16,33 @@ are the committed record.
 > verified copy and yields **Hit@4 0.875, MRR@4 0.796875** on every run. See
 > "Defect, determinism, and fix" below.
 
+## The two published MRR@4 values, reconciled
+
+Both numbers are real measurements of the **same gate**, over the **same 16
+source-labelled cases** on the **same corpus generation**, against the **same
+floors** (Hit@4 ≥ 0.85, MRR@4 ≥ 0.60 — never lowered). They differ only in which
+encoder embedded the *query* at run time. Quote whichever one matches the
+runtime you are describing, and name the runtime when you do.
+
+| Runtime label | Query encoder | Corpus vectors | Cases | Hit@4 | MRR@4 | Recorded in |
+| --- | --- | --- | --- | --- | --- | --- |
+| `fp32 PyTorch (local)` | `intfloat/multilingual-e5-small`, PyTorch fp32 | fp32 rows, 26,395 chunks | 16/16 | 0.875 | 0.796875 | this document (command and verbatim output below); `eval/results/report.md` |
+| `int8 ONNX (hosted image)` | same model, int8 graph `onnx/model_qint8_avx512_vnni.onnx` | the same fp32 rows, queried by the int8 graph | 16/16 | 0.875 | 0.802083 | `deploy/schemegpt-embedder/README.md` (two separate processes); `Dockerfile.render` (four runs) |
+
+Why they differ: the hosted API image runs the *query* encoder as an int8 ONNX
+graph inside a 512 MiB instance, while the corpus rows stay fp32. Mean cosine
+between int8 and fp32 query vectors over real corpus chunks is 0.989–0.991
+(`Dockerfile.render`, `deploy/schemegpt-embedder/README.md`), so the gate moves
+by 0.0052 — inside the floor, not a regression, and not an improvement to
+advertise. Neither number supersedes the other; a reader who sees one without
+its runtime label is looking at an unfinished citation.
+
+`web/lib/measured.ts` carries both values **and** both runtime labels, the UI
+renders them together, and `tests/test_web_measured_guard.py` parses this table:
+it fails if a value, a runtime label or the row structure changes on one side
+only, and it fails if either the 0.796875 or the 0.802083 literal is published
+in a tracked document without a runtime label in the same file.
+
 ## Defect, determinism, and fix (2026-10-06)
 
 ### 1. Plan-dependent lexical tie-break (the determinism defect)

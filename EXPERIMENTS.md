@@ -70,7 +70,7 @@ current generation experiments use the explicit JSON judge in `eval/run_eval.py`
   **logical document** and promoting the highest-trust copy by `data_status`
   (correctness: cite the hand-verified document over an automated import)
   recovers the verified copy with no case regressing, giving **Hit@4 0.875** and
-  **MRR@4 0.796875** — **above the 0.85 floor, so the deterministic gate passes**.
+  **MRR@4 0.796875** — the fp32/PyTorch run — **above the 0.85 floor, so the deterministic gate passes**.
   The floor was never lowered.
 - **Honest caveats:** this is the measured result on that corpus generation, not
   an ongoing production benchmark. The two deterministic misses are the PM-SYM

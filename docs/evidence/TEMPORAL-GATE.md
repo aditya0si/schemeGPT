@@ -67,9 +67,9 @@ gate under `--check-default-mode` and asserts its frozen numbers:
 | Retrieval cases completed | 16/16 |
 | Retrieval errors | 0 |
 | Hit@4 | 0.875 |
-| MRR@4 | 0.796875 |
+| MRR@4 (fp32/PyTorch run) | 0.796875 |
 
-This is the same 16/16 · 0.875 · 0.796875 recorded in
+This is the same 16/16 · 0.875 · 0.796875 (fp32/PyTorch query encoding) recorded in
 [`RETRIEVAL-GATE.md`](RETRIEVAL-GATE.md), reproduced by the temporal gate's
 default-mode re-check on every full run.
 

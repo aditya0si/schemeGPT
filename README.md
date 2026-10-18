@@ -14,8 +14,20 @@
 
 ---
 
-![SchemeGPT Demo Placeholder](https://raw.githubusercontent.com/aditya0si/schemeGPT/main/docs/demo.png)
-*Figure: Real-time SSE streaming answers with inline quote verification, deterministic profile matching, and bilingual search.*
+![SchemeGPT — the local portfolio candidate, home page at 1440×900](docs/screenshots/hero.png)
+*Figure: the local portfolio candidate (this branch, not a deploy) — ask a question, get a streamed answer with inline verified quotes and per-source provenance. The panel below the composer is the measured-evidence record, reachable from every page's `Evidence` link.*
+
+**Where to look, in order:** [the web app](https://schemegpt-web.vercel.app) ·
+[API readiness](https://schemegpt-api.onrender.com/readyz) ·
+[`docs/evidence/`](docs/evidence/) (six frozen measurement records) ·
+[`docs/portfolio-readiness-assessment.md`](https://github.com/aditya0si/schemeGPT/blob/audit/schemegpt-readiness/docs/portfolio-readiness-assessment.md)
+(an outside-in readiness assessment, including the gaps this branch fixes).
+
+> **Deployment status, stated plainly.** The public deployment at
+> `schemegpt-web.vercel.app` is live and predates this branch. The `/evidence`
+> and `/coverage` routes, the per-source provenance labels and the reconciled
+> MRR@4 table described below live in this branch and are **not** deployed yet —
+> this README does not claim otherwise.
 
 ---
 
@@ -178,7 +190,9 @@ verified copy. The diversity rule now caps one chunk per **logical document**
 by `data_status`, so the verified document is cited in preference to the
 automated import. The now-reproducible measurement on the full ingested corpus
 generation `7213926b8590933d...` (2,105 markdown files, ~20k chunks) is **Hit@4
-0.875** and **MRR@4 0.796875** across 16/16 completed cases with 0 retrieval
+0.875** and **MRR@4 0.796875** on the fp32 PyTorch run — the hosted API image
+queries the same fp32 vectors with an int8 ONNX encoder and scores **MRR@4
+0.802083** on the same 16 cases, same floors — across 16/16 completed cases with 0 retrieval
 errors, identical on 5 separate runs — **above the 0.85 floor, so the gate
 PASSES**. The two remaining deterministic misses are the PM-SYM Hinglish and
 unorganised-worker profile questions, neither of which has a lexical anchor. The
@@ -227,7 +241,8 @@ the corpus. Its golden set is **derived, not hand-written**: 124 cases from 10
 ladders, regenerable byte-identically from a frozen artifact of 41 claims. Every
 consistency floor — as-of, boundary, supersession, refusal, and retrieval-gate
 invariance — measures **1.000**, and era-mixing **0.000**; the retrieval gate
-still reports 16/16 · Hit@4 0.875 · MRR@4 0.796875. The capability is
+still reports 16/16 · Hit@4 0.875 · MRR@4 0.796875 (fp32 PyTorch; the hosted
+image's int8 ONNX encoder reports 0.802083 on the same cases). The capability is
 deliberately narrow and the limits are published with the numbers: only **79 of
 2,105** documents declare any date (1,982 declare none), there is no
 per-document revision chain, and the gate is a **consistency** check that proves
@@ -344,7 +359,7 @@ SchemeGPT/
 ├── loadtest/                 # Locust load test for the SSE endpoint (+ RESULTS.md)
 ├── docs/                     # Documentation & Specifications
 │   ├── AI-ENGINEERING.md     # In-depth architectural & RAG design guide
-│   ├── DEPLOY.md             # Hosted deployment runbook (Vercel + Fly.io + Neon)
+│   ├── DEPLOY.md             # Hosted deployment runbook (Vercel + Render + Neon)
 │   └── data-operations.md    # Scheme catalog curation & verification workflow
 ├── scripts/                  # Helper scripts
 │   ├── validate_data.py      # Dependency-free schema & directory validator
@@ -352,7 +367,7 @@ SchemeGPT/
 │   ├── reembed.py            # Rebuild vectors after an embedding-model change
 │   └── feedback_to_eval.py   # Curated user feedback -> candidate eval cases
 ├── .github/workflows/        # CI (tests, data validation, web build) + weekly eval gate
-├── fly.toml                  # Fly.io deployment config for the API
+├── fly.toml                  # Historical: the superseded Fly.io config (see docs/DEPLOY.md)
 ├── EXPERIMENTS.md            # Run-by-run experiment log with config fingerprints
 ├── Dockerfile                # API container multi-stage build
 ├── docker-compose.yml        # Multi-container orchestration (DB, API, Web, Streamlit)
