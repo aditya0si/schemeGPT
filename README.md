@@ -202,7 +202,7 @@ claimed — is recorded in
 [`docs/evidence/RETRIEVAL-GATE.md`](docs/evidence/RETRIEVAL-GATE.md). Retrieval
 quality remains a tracked metric, not a solved problem.
 
-<!-- claims: tests=603 evidence=22 -->
+<!-- claims: tests=614 evidence=22 -->
 
 **Generation quality (LLM judge):** live LLM judging is a manual experiment because
 Groq's free-tier daily quota can make infrastructure failures look like quality

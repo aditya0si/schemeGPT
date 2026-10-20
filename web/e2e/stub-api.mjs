@@ -122,6 +122,18 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(COVERAGE));
     return;
   }
+  if (req.method === "POST" && req.url === "/feedback") {
+    // The real POST /feedback contract: 200 + a small JSON ack. Used by
+    // web/e2e/csp.mjs to prove the browser's feedback POST is allowed under
+    // the strict connect-src policy.
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: "recorded", received_bytes: body.length }));
+    });
+    return;
+  }
   if (req.method === "GET" && req.url === "/readyz") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ status: "ready", mode: "live" }));
